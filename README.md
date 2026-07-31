@@ -11,15 +11,30 @@ edit templates, in your Bannerbear workspace.
   "mcpServers": {
     "bannerbear": {
       "command": "npx",
-      "args": ["-y", "@bannerbear/mcp"],
+      "args": ["-y", "@bannerbear/mcp@0.1.0"],
       "env": { "BANNERBEAR_API_KEY": "bb_ak_v5_..." }
     }
   }
 }
 ```
 
-Add that to `claude_desktop_config.json` (Claude Desktop) or run
-`claude mcp add bannerbear -e BANNERBEAR_API_KEY=bb_ak_v5_... -- npx -y @bannerbear/mcp`.
+Add that to `claude_desktop_config.json` (Claude Desktop), or for Claude Code:
+
+```sh
+claude mcp add bannerbear -s user \
+  -e BANNERBEAR_API_KEY=bb_ak_v5_... \
+  -- npx -y @bannerbear/mcp@0.1.0
+```
+
+Get an API key from your Bannerbear workspace settings. Prefer passing it from
+your environment (`-e BANNERBEAR_API_KEY="$BANNERBEAR_API_KEY"`) so the key
+doesn't end up in your shell history.
+
+> **If the first connection fails, retry.** The initial `npx` run downloads the
+> package from the registry, which can take longer than the MCP client's
+> startup timeout — you may see `Failed to connect` once. Every run after that
+> starts in about a second. Pinning the version as shown also stops npx
+> checking the registry for a newer release on every launch.
 
 ## Tools
 
