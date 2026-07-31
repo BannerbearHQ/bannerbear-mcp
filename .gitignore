@@ -1,0 +1,17 @@
+node_modules/
+dist/
+
+# Derived from spec/openapi.json by scripts/codegen.mjs — run `npm run build`.
+src/generated/
+
+# Internal notes, shared with the API team privately
+NOTES-FOR-API-TEAM.md
+
+# Local editor/agent state
+.claude/settings.local.json
+
+# npm pack artefacts
+*.tgz
+
+# Scratch copies kept while diffing spec revisions
+spec/openapi.prev.json
