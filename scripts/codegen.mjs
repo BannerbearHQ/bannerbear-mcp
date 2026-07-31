@@ -12,7 +12,7 @@
  * The 11 authoring schemas share 31 base attributes; those are emitted once and
  * spread into each type rather than repeated eleven times.
  */
-import { readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
@@ -263,6 +263,8 @@ export const MODIFICATION_REFERENCE = ${JSON.stringify(reference(modProps, Objec
 export const KEYFRAME_REFERENCE = ${JSON.stringify(reference(kfProps, Object.keys(kfProps)))};
 `;
 
+// src/generated is gitignored, so it does not exist in a fresh clone.
+mkdirSync(join(root, "src/generated"), { recursive: true });
 writeFileSync(join(root, "src/generated/schemas.ts"), out);
 console.log(
   `generated src/generated/schemas.ts\n` +
