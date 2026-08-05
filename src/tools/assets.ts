@@ -3,7 +3,11 @@ import { basename, extname, resolve } from "node:path";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { BannerbearClient } from "../client.js";
+import { ASSET_MIME_TYPES } from "../generated/schemas.js";
 import { fail, guard, pageParam } from "./common.js";
+
+const ACCEPTED = new Set<string>(ASSET_MIME_TYPES);
+const ACCEPTED_LIST = ASSET_MIME_TYPES.join(", ");
 
 /**
  * Documented cap on POST /assets. Checked locally so an oversized file fails
@@ -18,6 +22,10 @@ const MAX_ASSET_BYTES = 5 * 1024 * 1024;
  * every later consumer of that URL. Unknown extensions are refused rather than
  * defaulting to application/octet-stream, with `content_type` as the escape
  * hatch.
+ *
+ * Deliberately wider than ASSET_MIME_TYPES: recognising `.svg` as an image the
+ * API won't take produces a far better error than failing to recognise it at
+ * all. Acceptance is checked separately, against the generated list.
  */
 const MIME_BY_EXT: Record<string, string> = {
   ".png": "image/png",
@@ -45,29 +53,27 @@ export function registerAssetTools(server: McpServer, client: BannerbearClient) 
     {
       title: "Upload a local file",
       description:
-        "Upload a file from this machine and get back a durable CDN URL to " +
+        "Upload an image from this machine and get back a durable CDN URL to " +
         "use in a template layer or modification (background-image, image, " +
         "avatar, …). Only needed for files that live on disk — anything " +
         "already reachable at a public URL can be referenced directly without " +
-        "uploading. Max 5MB.",
+        `uploading. Accepts ${ACCEPTED_LIST}, max 5MB. Uploading the same ` +
+        "bytes twice is safe: the workspace deduplicates by content hash and " +
+        "returns the existing asset instead of a duplicate.",
       inputSchema: {
         path: z
           .string()
           .describe("Path to the file on this machine, absolute or relative to the server's cwd"),
-        filename: z
-          .string()
-          .optional()
-          .describe("Name to store it under; defaults to the file's own name"),
         content_type: z
-          .string()
+          .enum(ASSET_MIME_TYPES as unknown as [string, ...string[]])
           .optional()
           .describe(
             "Mime type override. Inferred from the file extension when omitted; " +
-              "required for extensions the server doesn't recognise."
+              "needed for extensions the server doesn't recognise."
           ),
       },
     },
-    async ({ path, filename, content_type }) => {
+    async ({ path, content_type }) => {
       const abs = resolve(path);
 
       let info;
@@ -91,16 +97,21 @@ export function registerAssetTools(server: McpServer, client: BannerbearClient) 
       if (!mime) {
         return fail(
           `Could not infer a mime type for "${ext || basename(abs)}". ` +
-            `Pass content_type explicitly (e.g. "image/png").`
+            `Pass content_type explicitly (one of: ${ACCEPTED_LIST}).`
+        );
+      }
+      // Recognised but not uploadable — the API answers 415. Say which format
+      // it is and what would work, rather than letting the round trip do it.
+      if (!ACCEPTED.has(mime)) {
+        return fail(
+          `${basename(abs)} is ${mime}, which the assets endpoint does not ` +
+            `accept. Accepted types: ${ACCEPTED_LIST}.`
         );
       }
 
       const data = await readFile(abs);
       return guard(() =>
-        client.request("POST", "/assets", {
-          raw: { data, contentType: mime },
-          query: { filename: filename ?? basename(abs) },
-        })
+        client.request("POST", "/assets", { raw: { data, contentType: mime } })
       );
     }
   );

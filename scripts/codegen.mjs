@@ -95,6 +95,17 @@ if (fingerprint(imageMods) !== fingerprint(batchMods)) {
 
 const imageFormats = body("/images").properties.formats.items.enum;
 
+// POST /assets declares what it accepts as request content types rather than in
+// a schema, so read the keys. Anything else comes back 415, and knowing the list
+// lets upload_asset reject locally instead of after pushing the bytes.
+const assetMimeTypes = Object.keys(
+  spec.paths["/assets"].post.requestBody?.content ?? {}
+).filter((ct) => !ct.includes("*"));
+if (assetMimeTypes.length === 0) {
+  console.error("FATAL: POST /assets no longer lists the content types it accepts.");
+  process.exit(1);
+}
+
 // --- Emit -------------------------------------------------------------------
 const esc = (s) => String(s).replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 const key = (k) => (/^[A-Za-z_$][\w$]*$/.test(k) ? k : JSON.stringify(k));
@@ -221,6 +232,9 @@ export const LayerModification = z.object(modificationShape).passthrough();
 
 export const IMAGE_FORMATS = ${JSON.stringify(imageFormats)} as const;
 
+/** Content types POST /assets accepts; anything else is a 415. */
+export const ASSET_MIME_TYPES = ${JSON.stringify(assetMimeTypes)} as const;
+
 /**
  * Attributes each layer type accepts. Used to catch attributes that belong to a
  * different layer type, without rejecting ones the spec simply hasn't caught up
@@ -250,5 +264,6 @@ console.log(
   `generated src/generated/schemas.ts\n` +
     `  ${Object.keys(typeToComponent).length} layer types: ${Object.keys(typeToComponent).join(", ")}\n` +
     `  ${baseKeys.length} shared base attributes\n` +
-    `  ${Object.keys(modProps).length} modification attributes`
+    `  ${Object.keys(modProps).length} modification attributes\n` +
+    `  ${assetMimeTypes.length} asset mime types: ${assetMimeTypes.join(", ")}`
 );

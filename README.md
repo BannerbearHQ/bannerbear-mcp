@@ -94,10 +94,18 @@ transparently re-submits to the async endpoint and polls.
 can't cover: a file that only exists on the machine running the server. It reads
 the path you give it and sends the raw bytes with the file's own mime type —
 the single request in the client that isn't JSON. Anything already reachable at
-a public URL should be referenced directly instead. Existence, file-ness,
-emptiness, the 5MB cap and the mime type are all checked locally, so the
-failures the API would return as `400`/`413` arrive naming the file and its
-size instead.
+a public URL should be referenced directly instead.
+
+Existence, file-ness, emptiness, the 5MB cap and the mime type are all checked
+locally, so the failures the API would return as `400`/`413`/`415` arrive naming
+the file, its size and its format. The accepted types come from the spec via
+codegen (`ASSET_MIME_TYPES`), so a format the API adds later needs no code
+change. The extension table is deliberately wider than that list: recognising
+`.svg` as an image the endpoint won't take gives a far better error than not
+recognising it at all.
+
+Re-uploading is safe — the workspace deduplicates by content hash and returns
+the existing asset rather than a copy.
 
 **Two layer shapes, deliberately kept apart.** Template *authoring* uses 11
 typed layer schemas (`text`, `rectangle`, `rectangle_image_container`, `circle`,

@@ -265,6 +265,33 @@ check(
   unknownMime.isError && unknownMime.text.includes("content_type"),
   unknownMime.text
 );
+check(
+  "that prompt names the accepted types",
+  unknownMime.text.includes("image/png") && unknownMime.text.includes("image/webp"),
+  unknownMime.text
+);
+
+// Recognised, but the endpoint only takes four raster formats.
+const svgPath = join(tmp, "logo.svg");
+writeFileSync(svgPath, "<svg/>");
+const unsupported = await call("upload_asset", { path: svgPath });
+check(
+  "a recognised but unaccepted format is rejected locally, by name",
+  unsupported.isError &&
+    unsupported.text.includes("image/svg+xml") &&
+    unsupported.text.includes("Accepted types"),
+  unsupported.text
+);
+
+const badOverride = await call("upload_asset", {
+  path: svgPath,
+  content_type: "application/pdf",
+});
+check(
+  "content_type outside the accepted list is refused by the tool schema",
+  badOverride.isError,
+  badOverride.text
+);
 
 const overridden = await call("upload_asset", {
   path: unknownExt,
