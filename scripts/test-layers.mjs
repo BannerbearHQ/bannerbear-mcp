@@ -312,6 +312,46 @@ check(
   `expected an API-level error, got: ${validUpload.text.slice(0, 200)}`
 );
 
+// --- batch existence check --------------------------------------------------
+const checkMissing = await call("check_assets", {
+  paths: [pngPath, join(tmp, "ghost.png")],
+});
+check(
+  "check_assets reports every unreadable path before hashing anything",
+  checkMissing.isError && checkMissing.text.includes("No such file"),
+  checkMissing.text
+);
+
+const checkDir = await call("check_assets", { paths: [tmp] });
+check(
+  "check_assets rejects a directory",
+  checkDir.isError && checkDir.text.includes("Not a file"),
+  checkDir.text
+);
+
+const checkOk = await call("check_assets", { paths: [pngPath, unknownExt] });
+check(
+  "check_assets hashes readable files and reaches the API",
+  /Bannerbear API error/.test(checkOk.text),
+  `expected an API-level error, got: ${checkOk.text.slice(0, 200)}`
+);
+
+const checkEmpty = await call("check_assets", { paths: [] });
+check(
+  "check_assets rejects an empty path list",
+  checkEmpty.isError,
+  checkEmpty.text
+);
+
+const checkTooMany = await call("check_assets", {
+  paths: Array.from({ length: 101 }, () => pngPath),
+});
+check(
+  "check_assets enforces the 100-file cap",
+  checkTooMany.isError,
+  checkTooMany.text
+);
+
 rmSync(tmp, { recursive: true, force: true });
 
 console.log(failures ? `\n${failures} failing` : "\nall checks passed");

@@ -38,6 +38,10 @@ export const TOOL_SCOPES: Record<string, string> = {
   upload_asset: "assets:write",
   get_asset: "assets:read",
   list_assets: "assets:read",
+  // A POST, but it only reads existence — mapped to :read on purpose. If the
+  // API turns out to gate it on :write, the cost is a visible tool that 403s;
+  // the reverse would hide a tool a read-only key could actually use.
+  check_assets: "assets:read",
 
   list_publications: "publications:read",
   get_publication: "publications:read",

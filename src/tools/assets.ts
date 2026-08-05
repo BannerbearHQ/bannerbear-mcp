@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readFile, stat } from "node:fs/promises";
 import { basename, extname, resolve } from "node:path";
 import { z } from "zod";
@@ -59,7 +60,9 @@ export function registerAssetTools(server: McpServer, client: BannerbearClient) 
         "already reachable at a public URL can be referenced directly without " +
         `uploading. Accepts ${ACCEPTED_LIST}, max 5MB. Uploading the same ` +
         "bytes twice is safe: the workspace deduplicates by content hash and " +
-        "returns the existing asset instead of a duplicate.",
+        "returns the existing asset instead of a duplicate, without counting " +
+        "against the trial account limit of 20 assets. To skip the transfer " +
+        "entirely for files that are already stored, call check_assets first.",
       inputSchema: {
         path: z
           .string()
@@ -113,6 +116,67 @@ export function registerAssetTools(server: McpServer, client: BannerbearClient) 
       return guard(() =>
         client.request("POST", "/assets", { raw: { data, contentType: mime } })
       );
+    }
+  );
+
+  server.registerTool(
+    "check_assets",
+    {
+      title: "Check which local files are already uploaded",
+      description:
+        "Given local file paths, report which are already stored in this " +
+        "workspace and which still need uploading. Hashes each file here and " +
+        "batch-checks the hashes, so nothing is transferred — use it before a " +
+        "run of uploads to skip files that are already there. Returns the CDN " +
+        "URL for the ones that exist, so a hit needs no further call. " +
+        "Max 100 files.",
+      inputSchema: {
+        paths: z
+          .array(z.string())
+          .min(1)
+          .max(100)
+          .describe("Paths to files on this machine, absolute or relative to the server's cwd"),
+      },
+    },
+    async ({ paths }) => {
+      // Validate every path before hashing any of it, and report all the bad
+      // ones at once — failing a 100-file check one typo at a time is miserable.
+      const resolved = paths.map((p) => resolve(p));
+      const problems: string[] = [];
+      for (const abs of resolved) {
+        try {
+          const info = await stat(abs);
+          if (!info.isFile()) problems.push(`Not a file: ${abs}`);
+        } catch {
+          problems.push(`No such file: ${abs}`);
+        }
+      }
+      if (problems.length) return fail(problems.join("\n"));
+
+      // Sequential so peak memory stays at one file rather than all 100.
+      const hashes: string[] = [];
+      for (const abs of resolved) {
+        hashes.push(createHash("sha256").update(await readFile(abs)).digest("hex"));
+      }
+
+      return guard(async () => {
+        const found = await client.request<Record<string, unknown>>(
+          "POST",
+          "/assets/check",
+          // Duplicate paths would send a duplicate hash; the response is keyed
+          // by hash either way, so collapse them before asking.
+          { body: { content_hashes: [...new Set(hashes)] } }
+        );
+        return resolved.map((abs, i) => {
+          const asset = found?.[hashes[i]] ?? null;
+          return {
+            path: abs,
+            content_hash: hashes[i],
+            uploaded: asset !== null,
+            asset,
+          };
+        });
+      });
     }
   );
 

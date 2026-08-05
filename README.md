@@ -47,7 +47,7 @@ breaking changes without opting in.
 
 ## Tools
 
-28 tools covering all 28 V5 endpoints.
+29 tools covering all 29 V5 endpoints.
 
 | Group | Tools |
 | --- | --- |
@@ -56,7 +56,7 @@ breaking changes without opting in.
 | Templates | `list_templates`, `get_template`, `upsert_image_template`, `delete_template` |
 | Generation | `generate_image`, `get_image`, `list_images` |
 | Batches | `create_batch`, `get_batch`, `list_batches` |
-| Assets | `upload_asset`, `get_asset`, `list_assets` |
+| Assets | `upload_asset`, `check_assets`, `get_asset`, `list_assets` |
 | Publications | `list_publications`, `get_publication`, `install_publication` |
 | Webhooks | `list_webhooks`, `get_webhook`, `create_webhook`, `update_webhook`, `delete_webhook` |
 | Instant URLs | `list_instant_urls`, `get_instant_url`, `create_instant_url`, `update_instant_url`, `delete_instant_url` |
@@ -105,7 +105,14 @@ change. The extension table is deliberately wider than that list: recognising
 recognising it at all.
 
 Re-uploading is safe — the workspace deduplicates by content hash and returns
-the existing asset rather than a copy.
+the existing asset rather than a copy, and a dedupe hit doesn't count against
+the trial account's 20-asset limit.
+
+`check_assets` skips the transfer altogether. It hashes local files here and
+batch-checks the hashes, so a file that's already stored costs no upload at all
+and comes back with its CDN URL. It takes paths rather than hashes deliberately:
+the endpoint is specified in terms of SHA-256 digests, but a model can't compute
+one, so a hash-shaped tool would be unusable from the thing driving it.
 
 **Two layer shapes, deliberately kept apart.** Template *authoring* uses 11
 typed layer schemas (`text`, `rectangle`, `rectangle_image_container`, `circle`,
@@ -125,7 +132,7 @@ bag — so a conversation pays only for the types it actually uses:
 | `layer_type: "text"` | 4.6 KB |
 | `section: "modifications"` | 8.9 KB |
 
-Tool definitions total ~5.4k tokens.
+Tool definitions total ~5.7k tokens.
 
 **Layers are validated locally before the request goes out.** The tool schema
 carries the `type` enum, so a bad type is caught by the MCP layer. The handler
