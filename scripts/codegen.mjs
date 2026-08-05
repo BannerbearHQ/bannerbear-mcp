@@ -132,6 +132,10 @@ function zodFor(name, def, { required = false } = {}) {
     }
   }
   if (def.description) z += `.describe("${esc(def.description)}")`;
+  // `nullable: true` is how the spec marks "send null to clear this" — the
+  // *-secondary text attributes use it in place of the empty string they used
+  // to carry in their enums. Without this, null is rejected before it ships.
+  if (def.nullable) z += ".nullable()";
   if (!required) z += ".optional()";
   return `${key(name)}: ${z},`;
 }
@@ -146,7 +150,10 @@ const reference = (props, keys) =>
   keys
     .map((k) => {
       const d = props[k] ?? {};
-      const t = d.enum ? d.enum.join(" | ") : d.type || "string";
+      const base = d.enum ? d.enum.join(" | ") : d.type || "string";
+      // Surface nullability: for the *-secondary attributes null is the only
+      // way to clear a value, and the model can't infer that from the enum.
+      const t = d.nullable ? `${base} | null` : base;
       return `- \`${k}\` (${t})${d.description ? ` — ${d.description}` : ""}`;
     })
     .join("\n");
