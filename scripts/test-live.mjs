@@ -76,7 +76,7 @@ try {
   if (acct.data.quota) console.log(`    quota: ${JSON.stringify(acct.data.quota)}`);
 
   step(2, "list_templates — reading existing image templates");
-  const list = await call("list_templates", { type: "image" });
+  const list = await call("list_templates");
   console.log(`    ${list.data.length} template(s) (${list.ms}ms)`);
   for (const t of list.data.slice(0, 3)) {
     console.log(`      ${t.uid}  ${t.name}  ${t.width}x${t.height}`);
@@ -101,7 +101,7 @@ try {
   console.log(`    created ${templateUid} (${created.ms}ms)`);
 
   step(4, "get_template — reading it back");
-  const fetched = await call("get_template", { type: "image", uid: templateUid });
+  const fetched = await call("get_template", { uid: templateUid });
   // Requests and responses both use config.objects since the API was tightened.
   const layers = fetched.data.config?.objects ?? fetched.data.objects ?? [];
   console.log(`    ${layers.length} layers: ${layers.map((l) => `${l.id}(${l.type})`).join(" ")}`);
@@ -124,7 +124,7 @@ try {
       objects: layers.map((l) => (l.type === "text" ? { ...l, text: "Round-tripped" } : l)),
     },
   });
-  const after = await call("get_template", { type: "image", uid: templateUid });
+  const after = await call("get_template", { uid: templateUid });
   const afterLayers = after.data.config?.objects ?? after.data.objects ?? [];
   if (afterLayers.length !== 3) {
     throw new Error(
@@ -150,8 +150,8 @@ try {
     throw new Error(`expected status "completed", got "${img.data.status}"`);
   }
 
-  step(6, "list_media — confirming it landed");
-  const media = await call("list_media", { type: "image" });
+  step(6, "list_images — confirming it landed");
+  const media = await call("list_images");
   console.log(`    ${Array.isArray(media.data) ? media.data.length : "?"} image(s) in the workspace`);
 } catch (err) {
   failed = true;
@@ -160,7 +160,7 @@ try {
   if (templateUid && !KEEP) {
     step("cleanup", `deleting template ${templateUid}`);
     try {
-      await call("delete_template", { type: "image", uid: templateUid });
+      await call("delete_template", { uid: templateUid });
       console.log("    deleted");
     } catch (err) {
       console.error(`    cleanup failed — remove ${templateUid} by hand: ${err.message}`);

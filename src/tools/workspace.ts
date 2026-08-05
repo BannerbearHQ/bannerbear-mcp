@@ -6,7 +6,7 @@ import { guard, pageParam } from "./common.js";
 const webhookShape = {
   name: z.string().describe("Webhook name"),
   url: z.string().describe("URL to receive webhook events"),
-  resource: z.enum(["image", "batch", "video"]).optional(),
+  resource: z.enum(["image", "batch"]).optional(),
   event: z.enum(["all_events", "completed", "failed"]).optional(),
   status: z.enum(["active", "disabled"]).optional(),
   scope: z.enum(["all_templates", "specific_templates"]).optional(),

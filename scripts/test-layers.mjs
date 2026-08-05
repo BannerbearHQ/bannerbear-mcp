@@ -5,6 +5,9 @@
  * rejected locally with a useful message before any request is made.
  */
 import { spawn } from "node:child_process";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 const proc = spawn("node", ["dist/index.js"], {
   env: { ...process.env, BANNERBEAR_API_KEY: "bb_ak_v5_invalid" },
@@ -93,13 +96,6 @@ check(
   mods.text.slice(0, 200)
 );
 
-const kf = await call("get_layer_schema", { section: "keyframes" });
-check(
-  "keyframes section lists easings",
-  kf.text.includes("easeInOutQuad") && kf.text.includes("`duration`"),
-  kf.text.slice(0, 200)
-);
-
 // --- protocol robustness ---------------------------------------------------
 const omitted = await rpc("tools/call", { name: "get_account" });
 check(
@@ -152,16 +148,6 @@ check(
   badIndex.text
 );
 
-const badScene = await call("upsert_video_template", {
-  name: "v",
-  config: { scenes: [{ name: "s1", config: { objects: [{ id: "a", type: "bogus" }] } }] },
-});
-check(
-  "video scene layers validated with scene path",
-  badScene.isError && badScene.text.includes("config.scenes[0].config.objects[0]"),
-  badScene.text
-);
-
 const misplaced = await call("upsert_image_template", {
   name: "t",
   config: { objects: [{ id: "a", type: "text", text: "hi", "qr-target": "https://x" }] },
@@ -182,29 +168,6 @@ check(
   "attribute unknown to the spec is allowed through",
   /Bannerbear API error/.test(unknownAttr.text),
   `expected passthrough to the API, got: ${unknownAttr.text.slice(0, 200)}`
-);
-
-const sceneAlias = await call("upsert_video_template", {
-  name: "v",
-  scenes: [{ name: "s1", objects: [{ id: "a", type: "text", "qr-target": "https://x" }] }],
-});
-check(
-  "top-level scenes + scene objects aliases both lift into config",
-  sceneAlias.isError &&
-    sceneAlias.text.includes("config.scenes[0].config.objects[0]") &&
-    sceneAlias.text.includes('"qr-target" is not valid on a "text" layer'),
-  sceneAlias.text
-);
-
-const bothScenes = await call("upsert_video_template", {
-  name: "v",
-  scenes: [{ name: "a" }],
-  config: { scenes: [{ name: "b" }] },
-});
-check(
-  "scenes given both ways is rejected",
-  bothScenes.isError && bothScenes.text.includes("not both"),
-  bothScenes.text
 );
 
 const bothShapes = await call("upsert_image_template", {
@@ -265,6 +228,64 @@ check(
   validLayers.isError && /Bannerbear API error/.test(validLayers.text),
   `expected an API-level error, got: ${validLayers.text.slice(0, 300)}`
 );
+
+// --- asset upload -----------------------------------------------------------
+// Everything the upload tool can know without the network: the file exists, is
+// a file, is non-empty, is under the cap, and has a mime type we can name.
+const tmp = mkdtempSync(join(tmpdir(), "bb-assets-"));
+
+const missingFile = await call("upload_asset", { path: join(tmp, "nope.png") });
+check(
+  "upload of a nonexistent path is rejected locally",
+  missingFile.isError && missingFile.text.includes("No such file"),
+  missingFile.text
+);
+
+const dirUpload = await call("upload_asset", { path: tmp });
+check(
+  "upload of a directory is rejected locally",
+  dirUpload.isError && dirUpload.text.includes("Not a file"),
+  dirUpload.text
+);
+
+const emptyPath = join(tmp, "empty.png");
+writeFileSync(emptyPath, "");
+const emptyUpload = await call("upload_asset", { path: emptyPath });
+check(
+  "upload of an empty file is rejected locally",
+  emptyUpload.isError && emptyUpload.text.includes("empty"),
+  emptyUpload.text
+);
+
+const unknownExt = join(tmp, "thing.xyz");
+writeFileSync(unknownExt, "data");
+const unknownMime = await call("upload_asset", { path: unknownExt });
+check(
+  "unknown extension asks for content_type rather than guessing",
+  unknownMime.isError && unknownMime.text.includes("content_type"),
+  unknownMime.text
+);
+
+const overridden = await call("upload_asset", {
+  path: unknownExt,
+  content_type: "image/png",
+});
+check(
+  "content_type override lets an unknown extension through to the API",
+  /Bannerbear API error/.test(overridden.text),
+  `expected the override to reach the API, got: ${overridden.text.slice(0, 200)}`
+);
+
+const pngPath = join(tmp, "pixel.png");
+writeFileSync(pngPath, Buffer.from("89504e470d0a1a0a", "hex"));
+const validUpload = await call("upload_asset", { path: pngPath });
+check(
+  "a real file infers its mime type and reaches the API",
+  /Bannerbear API error/.test(validUpload.text),
+  `expected an API-level error, got: ${validUpload.text.slice(0, 200)}`
+);
+
+rmSync(tmp, { recursive: true, force: true });
 
 console.log(failures ? `\n${failures} failing` : "\nall checks passed");
 proc.kill();

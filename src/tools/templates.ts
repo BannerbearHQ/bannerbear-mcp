@@ -5,12 +5,9 @@ import {
   AnyLayer,
   LAYER_TYPES,
   LAYER_TYPE_KEYS,
-  FRAME_RATES,
   SHARED_LAYER_REFERENCE,
   LAYER_TYPE_REFERENCE,
   MODIFICATION_REFERENCE,
-  KEYFRAME_REFERENCE,
-  EASINGS,
 } from "../generated/schemas.js";
 import { fail, guard, ok, pageParam, summariseLayers } from "./common.js";
 
@@ -24,7 +21,7 @@ const layerTypeEnum = z.enum(LAYER_TYPES as unknown as [string, ...string[]]);
  */
 const AuthoredLayer = z
   .object({
-    id: z.string().describe("Unique layer id, referenced by keyframes"),
+    id: z.string().describe("Unique layer id"),
     type: layerTypeEnum.describe("Layer type — determines which attributes apply"),
     name: z.string().optional().describe("Layer name — how modifications target it later"),
   })
@@ -37,9 +34,9 @@ const AuthoredLayer = z
 /**
  * Requests and responses both use `config` now, so the round trip is safe. The
  * top-level alias is kept as a convenience for hand-written calls: lifts
- * `objects`/`scenes` into `config` rather than letting the API ignore them.
+ * `objects` into `config` rather than letting the API ignore it.
  */
-function liftIntoConfig<K extends "objects" | "scenes">(body: any, key: K): any {
+function liftIntoConfig(body: any, key: "objects"): any {
   const value = body?.[key];
   if (value === undefined) return body;
   const { [key]: _lifted, ...rest } = body;
@@ -53,7 +50,7 @@ function liftIntoConfig<K extends "objects" | "scenes">(body: any, key: K): any 
 
 const SCHEMA_HINT =
   "Call get_layer_schema first for the attributes of each layer type. " +
-  "Passing config/scenes replaces them wholesale — fetch the template with " +
+  "Passing config replaces it wholesale — fetch the template with " +
   "get_template and send back the complete list, or existing layers are lost.";
 
 /** Which layer types accept a given attribute — for "you meant this type" errors. */
@@ -102,47 +99,6 @@ function validateLayers(layers: unknown[], where: string): string | null {
   return null;
 }
 
-const SceneSchema = z.object({
-    uid: z.string().optional().describe("Existing scene UID. Omit to create a new scene."),
-    name: z.string().optional().describe("Scene name"),
-    sort: z.number().int().optional().describe("Position in the timeline"),
-    scene_type: z.enum(["graphic", "video"]).optional(),
-    media_url: z.string().optional().describe("Background video URL (video scenes)"),
-    play_media_to_end: z
-      .boolean()
-      .optional()
-      .describe("Run the scene for the full length of media_url"),
-    objects: z
-      .array(AuthoredLayer)
-      .optional()
-      .describe("Convenience alias for this scene's config.objects"),
-    config: z
-      .object({
-        objects: z.array(AuthoredLayer).optional().describe("Layers on the scene"),
-        keyframes: z
-          .record(
-            z.array(
-              z
-                .object({
-                  delay: z.number().int().min(0).max(10000).optional(),
-                  duration: z.number().int().min(0).max(10000).optional(),
-                  endDelay: z.number().int().min(0).max(10000).optional(),
-                  easing: z.string().optional(),
-                })
-                .passthrough()
-            )
-          )
-          .optional()
-          .describe(
-            "Animation keyframes keyed by layer id; each value is an " +
-              "ordered array. Timing fields advance the timeline; any " +
-              "other attribute sets a target to tween to. See " +
-              "get_layer_schema section=keyframes."
-          ),
-      })
-      .optional(),
-});
-
 export function registerTemplateTools(
   server: McpServer,
   client: BannerbearClient
@@ -150,7 +106,7 @@ export function registerTemplateTools(
   server.registerTool(
     "get_layer_schema",
     {
-      title: "Get layer, modification & keyframe schema",
+      title: "Get layer & modification schema",
       description:
         `Attribute reference for designing templates. There are ${LAYER_TYPES.length} layer ` +
         `types (${LAYER_TYPES.join(", ")}), each with its own attributes on top ` +
@@ -158,11 +114,11 @@ export function registerTemplateTools(
         "that type.",
       inputSchema: {
         section: z
-          .enum(["layers", "modifications", "keyframes"])
+          .enum(["layers", "modifications"])
           .default("layers")
           .describe(
             "layers = template authoring; modifications = changing an existing " +
-              "layer at generation time; keyframes = video animation"
+              "layer at generation time"
           ),
         layer_type: layerTypeEnum
           .optional()
@@ -176,19 +132,9 @@ export function registerTemplateTools(
       if (section === "modifications") {
         return ok(
           `## Modification attributes (${MODIFICATION_REFERENCE.split("\n").length})\n\n` +
-            `Used by generate_image / generate_video / create_batch to change a ` +
+            `Used by generate_image / create_batch to change a ` +
             `layer that already exists. Target a layer by name or id, then set ` +
             `any of these. Flat across all layer types.\n\n${MODIFICATION_REFERENCE}`
-        );
-      }
-
-      if (section === "keyframes") {
-        return ok(
-          `## Keyframe attributes (video only)\n\n` +
-            `Keyframes are keyed by layer id, each an ordered array. Timing ` +
-            `fields advance the timeline; any other attribute sets a target the ` +
-            `layer tweens to over \`duration\` ms.\n\n${KEYFRAME_REFERENCE}\n\n` +
-            `### Easings\n${EASINGS.join(", ")}`
         );
       }
 
@@ -220,23 +166,20 @@ export function registerTemplateTools(
     {
       title: "List templates",
       description:
-        "List image or video templates. Returns uid, name, dimensions and a " +
+        "List image templates. Returns uid, name, dimensions and a " +
         "layer summary — call get_template for the full canvas config.",
-      inputSchema: {
-        type: z.enum(["image", "video"]).describe("Which template family to list"),
-        ...pageParam,
-      },
+      inputSchema: { ...pageParam },
     },
-    async ({ type, page }) =>
+    async ({ page }) =>
       guard(async () => {
-        const path = type === "image" ? "/image_templates" : "/video_templates";
-        const rows = await client.request<any[]>("GET", path, { query: { page } });
+        const rows = await client.request<any[]>("GET", "/image_templates", {
+          query: { page },
+        });
         return (Array.isArray(rows) ? rows : []).map((t) => ({
           uid: t.uid,
           name: t.name,
           width: t.width,
           height: t.height,
-          ...(type === "video" ? { frame_rate: t.frame_rate } : {}),
           layers: summariseLayers(t.config),
         }));
       })
@@ -247,21 +190,12 @@ export function registerTemplateTools(
     {
       title: "Get a template",
       description:
-        "Fetch one template with its full canvas config — all layers, plus " +
-        "scenes and keyframes for video. Use before editing, and to learn the " +
-        "layer names to target when generating.",
-      inputSchema: {
-        type: z.enum(["image", "video"]),
-        uid: z.string().describe("Template UID"),
-      },
+        "Fetch one template with its full canvas config — every layer. Use " +
+        "before editing, and to learn the layer names to target when " +
+        "generating.",
+      inputSchema: { uid: z.string().describe("Template UID") },
     },
-    async ({ type, uid }) =>
-      guard(() =>
-        client.request(
-          "GET",
-          `${type === "image" ? "/image_templates" : "/video_templates"}/${uid}`
-        )
-      )
+    async ({ uid }) => guard(() => client.request("GET", `/image_templates/${uid}`))
   );
 
   server.registerTool(
@@ -270,8 +204,7 @@ export function registerTemplateTools(
       title: "Create or update an image template",
       description:
         "Create a new image template, or update an existing one by passing " +
-        "uid. Image templates render a single static frame — keyframe " +
-        "animation is video-only. " +
+        "uid. " +
         SCHEMA_HINT,
       inputSchema: {
         uid: z
@@ -316,86 +249,15 @@ export function registerTemplateTools(
   );
 
   server.registerTool(
-    "upsert_video_template",
-    {
-      title: "Create or update a video template",
-      description:
-        "Create a new video template, or update an existing one by passing " +
-        "uid. Scenes form the ordered timeline; each scene carries its own " +
-        "layers and optional animation keyframes, keyed by layer id. " +
-        SCHEMA_HINT,
-      inputSchema: {
-        uid: z
-          .string()
-          .optional()
-          .describe("Omit to create a new template; pass to update an existing one"),
-        name: z.string().optional().describe("Template name (required when creating)"),
-        description: z.string().optional(),
-        width: z.number().int().optional(),
-        height: z.number().int().optional(),
-        frame_rate: z
-          .union(FRAME_RATES.map((f) => z.literal(f)) as any)
-          .optional()
-          .describe("Frames per second"),
-        config: z
-          .object({ scenes: z.array(SceneSchema).describe("Ordered scene list") })
-          .optional()
-          .describe("Full template configuration; replaces the scene list in place"),
-        scenes: z
-          .array(SceneSchema)
-          .optional()
-          .describe("Convenience alias for config.scenes"),
-      },
-    },
-    async ({ uid, ...raw }) => {
-      if (!uid && !raw.name) return fail("name is required when creating a template");
-
-      let body;
-      try {
-        // Scenes sit at config.scenes, mirroring image templates' config.objects.
-        body = liftIntoConfig(raw, "scenes");
-        if (body.config?.scenes) {
-          body = {
-            ...body,
-            config: { ...body.config, scenes: body.config.scenes.map((s: any) => liftIntoConfig(s, "objects")) },
-          };
-        }
-      } catch (err) {
-        return fail((err as Error).message);
-      }
-
-      for (const [i, scene] of (body.config?.scenes ?? []).entries() as [number, any][]) {
-        if (!scene.config?.objects) continue;
-        const problem = validateLayers(
-          scene.config.objects,
-          `config.scenes[${i}].config.objects`
-        );
-        if (problem) return fail(problem);
-      }
-      return guard(() =>
-        uid
-          ? client.request("PATCH", `/video_templates/${uid}`, { body })
-          : client.request("POST", "/video_templates", { body })
-      );
-    }
-  );
-
-  server.registerTool(
     "delete_template",
     {
       title: "Delete a template",
-      description: "Permanently delete an image or video template.",
-      inputSchema: {
-        type: z.enum(["image", "video"]),
-        uid: z.string().describe("Template UID"),
-      },
+      description: "Permanently delete an image template.",
+      inputSchema: { uid: z.string().describe("Template UID") },
     },
-    async ({ type, uid }) =>
+    async ({ uid }) =>
       guard(async () => {
-        await client.request(
-          "DELETE",
-          `${type === "image" ? "/image_templates" : "/video_templates"}/${uid}`
-        );
+        await client.request("DELETE", `/image_templates/${uid}`);
         return { deleted: uid };
       })
   );

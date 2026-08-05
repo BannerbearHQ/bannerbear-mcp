@@ -61,7 +61,6 @@ const slices = [
   ["overview", {}],
   ["layer_type=text", { layer_type: "text" }],
   ["modifications", { section: "modifications" }],
-  ["keyframes", { section: "keyframes" }],
 ];
 console.log("\nget_layer_schema (pulled on demand):");
 for (const [label, args] of slices) {

@@ -62,7 +62,17 @@ export class BannerbearClient {
   async request<T = any>(
     method: string,
     path: string,
-    opts: { body?: unknown; query?: Record<string, unknown>; sync?: boolean } = {}
+    opts: {
+      body?: unknown;
+      query?: Record<string, unknown>;
+      sync?: boolean;
+      /**
+       * Send these bytes verbatim instead of JSON. `/assets` takes the raw file
+       * as the request body with the file's own mime type, so the usual
+       * JSON.stringify + application/json path would corrupt the upload.
+       */
+      raw?: { data: Uint8Array; contentType: string };
+    } = {}
   ): Promise<T> {
     const base = opts.sync ? SYNC_BASE : ASYNC_BASE;
     const url = new URL(base + path);
@@ -80,10 +90,14 @@ export class BannerbearClient {
           method,
           headers: {
             Authorization: `Bearer ${this.apiKey}`,
-            "Content-Type": "application/json",
+            "Content-Type": opts.raw ? opts.raw.contentType : "application/json",
             Accept: "application/json",
           },
-          body: opts.body === undefined ? undefined : JSON.stringify(opts.body),
+          body: opts.raw
+            ? opts.raw.data
+            : opts.body === undefined
+              ? undefined
+              : JSON.stringify(opts.body),
         });
       } catch (cause) {
         if (attempt >= maxAttempts) {

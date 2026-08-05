@@ -90,89 +90,26 @@ export function registerGenerationTools(
   );
 
   server.registerTool(
-    "generate_video",
+    "get_image",
     {
-      title: "Generate a video",
+      title: "Get an image",
       description:
-        "Render a video from a video template. Videos have no synchronous " +
-        "endpoint, so this queues the job and polls until it finishes.",
-      inputSchema: {
-        template: z.string().describe("Video template UID"),
-        modifications: z
-          .object({
-            template: z
-              .object({
-                width: z.number().int().optional(),
-                height: z.number().int().optional(),
-                fps: z.union([z.literal(24), z.literal(30), z.literal(60)]).optional(),
-              })
-              .optional(),
-            scenes: z
-              .array(
-                z
-                  .object({
-                    name: z.string().optional().describe("Scene name to target"),
-                    id: z.string().optional().describe("Scene ID to target"),
-                    media_url: z.string().optional(),
-                    play_media_to_end: z.boolean().optional(),
-                    objects: z.array(LayerModification).optional(),
-                  })
-                  .passthrough()
-              )
-              .optional()
-              .describe("Per-scene overrides, targeted by scene name or id"),
-          })
-          .describe("Template, scene and layer modifications"),
-        metadata: z.string().optional(),
-        wait: z
-          .boolean()
-          .default(true)
-          .describe("Wait for the finished video, or return a uid immediately"),
-        timeout_seconds: z
-          .number()
-          .int()
-          .min(10)
-          .max(900)
-          .default(300)
-          .describe("How long to poll before returning the uid to check later"),
-      },
+        "Retrieve a previously generated image by uid — use this to check on " +
+        "a job that was queued without waiting.",
+      inputSchema: { uid: z.string() },
     },
-    async ({ wait, timeout_seconds, ...body }) =>
-      guard(async () => {
-        const queued = await client.request<any>("POST", "/videos", { body });
-        if (!wait) return queued;
-        return client.pollUntilDone(`/videos/${queued.uid}`, timeout_seconds * 1000);
-      })
+    async ({ uid }) => guard(() => client.request("GET", `/images/${uid}`))
   );
 
   server.registerTool(
-    "get_media",
+    "list_images",
     {
-      title: "Get an image or video",
-      description:
-        "Retrieve a previously generated image or video by uid — use this to " +
-        "check on a job that was queued without waiting.",
-      inputSchema: {
-        type: z.enum(["image", "video"]),
-        uid: z.string(),
-      },
+      title: "List images",
+      description: "List previously generated images, newest first.",
+      inputSchema: { ...pageParam },
     },
-    async ({ type, uid }) =>
-      guard(() => client.request("GET", `/${type}s/${uid}`))
-  );
-
-  server.registerTool(
-    "list_media",
-    {
-      title: "List images or videos",
-      description: "List previously generated images or videos, newest first.",
-      inputSchema: {
-        type: z.enum(["image", "video"]),
-        ...pageParam,
-      },
-    },
-    async ({ type, page }) =>
-      guard(() => client.request("GET", `/${type}s`, { query: { page } }))
+    async ({ page }) =>
+      guard(() => client.request("GET", "/images", { query: { page } }))
   );
 
   server.registerTool(
