@@ -16,7 +16,7 @@ templates, in your Bannerbear workspace.
   "mcpServers": {
     "bannerbear": {
       "command": "npx",
-      "args": ["-y", "@bannerbear/mcp@0.2.0"],
+      "args": ["-y", "@bannerbear/mcp"],
       "env": { "BANNERBEAR_API_KEY": "bb_ak_v5_..." }
     }
   }
@@ -28,7 +28,7 @@ Add that to `claude_desktop_config.json` (Claude Desktop), or for Claude Code:
 ```sh
 claude mcp add bannerbear -s user \
   -e BANNERBEAR_API_KEY=bb_ak_v5_... \
-  -- npx -y @bannerbear/mcp@0.2.0
+  -- npx -y @bannerbear/mcp
 ```
 
 Get an API key from your Bannerbear workspace settings. Prefer passing it from
@@ -38,8 +38,11 @@ doesn't end up in your shell history.
 > **If the first connection fails, retry.** The initial `npx` run downloads the
 > package from the registry, which can take longer than the MCP client's
 > startup timeout — you may see `Failed to connect` once. Every run after that
-> starts in about a second. Pinning the version as shown also stops npx
-> checking the registry for a newer release on every launch.
+> starts in about a second.
+
+Unpinned, npx picks up new releases automatically and checks the registry on
+each launch. Append a version (`@bannerbear/mcp@0.2.0`) to freeze the tool
+surface and skip that check.
 
 ## Tools
 
@@ -99,8 +102,8 @@ Tool definitions total ~5.4k tokens.
 carries the `type` enum, so a bad type is caught by the MCP layer. The handler
 then checks each layer against its per-type schema and reports the offending
 index — `config.objects[1]` — with a pointer to the right `get_layer_schema`
-call. Attributes belonging to a *different* layer
-type are rejected by name (`"qr-target" is not valid on a "text" layer — it
+call. Attributes belonging to a *different* layer type are rejected by name
+(`"qr-target" is not valid on a "text" layer — it
 belongs to "qr_code"`), while attributes the spec doesn't know about are passed
 through, so the server doesn't block on a spec that trails the API.
 
