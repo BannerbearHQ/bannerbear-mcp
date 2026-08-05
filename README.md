@@ -62,7 +62,27 @@ surface and skip that check.
 
 Video support in V5 is planned for an upcoming release.
 
+A scoped API key sees fewer — see below.
+
 ### Design notes
+
+**Tools narrow to the key's scopes.** `GET /account` reports the scopes the API
+key holds, and is reachable on every key regardless of scope. On startup the
+server reads them and disables the tools the key isn't authorized for, so a
+read-only key stops offering calls that could only ever come back `403`.
+
+This runs *after* the transport connects, not before: the full list is served
+immediately and then narrows, which the client picks up through the
+`listChanged` notification. Putting the round trip in front of the handshake
+would add it to every launch, and startup latency is already the one thing that
+makes `npx` installs fail.
+
+It fails open in every uncertain case. An unreachable `/account`, a malformed
+response, or an empty `scopes` array (which the API uses to mean full access)
+all leave the complete surface enabled — wrongly hiding a tool that would have
+worked is worse than letting a `403` speak for itself. `scripts/test-scopes.mjs`
+asserts each of those paths, and checks the scope table against the enum in the
+spec so a typo can't silently disable a tool.
 
 **Sync-first image generation.** `generate_image` posts to
 `sync.api.bannerbear.com` and returns the finished file in a single call. That
@@ -138,4 +158,6 @@ component schemas are found, or when the modification schemas for images and
 batches stop being identical.
 
 `scripts/test-layers.mjs` covers layer validation and the schema reference
-without hitting the API.
+without hitting the API. `scripts/test-scopes.mjs` covers scope filtering
+against stub tool handles, including every fail-open path. Both run under
+`npm test`.

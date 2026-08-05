@@ -18,7 +18,7 @@
     "build": "npm run codegen && tsc",
     "dev": "npm run build && node dist/index.js",
     "prepublishOnly": "npm run build",
-    "test": "node scripts/test-layers.mjs",
+    "test": "node scripts/test-layers.mjs && node scripts/test-scopes.mjs",
     "test:live": "node scripts/test-live.mjs",
     "smoke": "node scripts/smoke.mjs"
   },

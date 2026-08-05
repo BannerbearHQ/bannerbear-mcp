@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { RegisteredTool } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { BannerbearClient } from "./client.js";
+import { applyScopeFilter } from "./scopes.js";
 import { registerTemplateTools } from "./tools/templates.js";
 import { registerGenerationTools } from "./tools/generate.js";
 import { registerWorkspaceTools } from "./tools/workspace.js";
@@ -46,14 +48,32 @@ const server = new McpServer({
   version: "0.2.0",
 });
 
+// Capture each tool handle as it registers, so applyScopeFilter can disable a
+// subset later. The SDK keeps its registry private and the tool modules have no
+// reason to know scopes exist, so intercept here and restore straight after.
+const handles: Record<string, RegisteredTool> = {};
+const registerTool = server.registerTool.bind(server);
+(server as any).registerTool = (name: string, ...rest: unknown[]) => {
+  const tool = (registerTool as any)(name, ...rest);
+  handles[name] = tool;
+  return tool;
+};
+
 registerWorkspaceTools(server, client);
 registerTemplateTools(server, client);
 registerGenerationTools(server, client);
 registerAssetTools(server, client);
 registerPublicationTools(server, client);
 
+(server as any).registerTool = registerTool;
+
 const transport = new StdioServerTransport();
 await server.connect(transport);
+
+// Deliberately not awaited: the tool list is already serving, and narrowing it
+// to the key's scopes is a refinement the client picks up via listChanged.
+// Blocking on it here would put an API round trip in front of every launch.
+void applyScopeFilter(client, handles);
 
 // `arguments` is optional in tools/call per the MCP spec, but the SDK parses it
 // against the tool's schema, so omitting it fails every tool whose parameters
