@@ -151,7 +151,7 @@ bag — so a conversation pays only for the types it actually uses:
 | `layer_type: "text"` | 4.6 KB |
 | `section: "modifications"` | 8.9 KB |
 
-Tool definitions total ~8.0k tokens.
+Tool definitions total ~8.1k tokens.
 
 **Layers are validated locally before the request goes out.** The tool schema
 carries the `type` enum, so a bad type is caught by the MCP layer. The handler
@@ -189,8 +189,15 @@ automatically.
 
 Codegen fails loudly rather than degrading quietly if the spec's shape changes:
 it aborts when `config.objects` loses its `type` discriminator, when no `Layer*`
-component schemas are found, or when the modification schemas for images and
-batches stop being identical.
+component schemas are found, when the modification schemas for images and
+batches stop being identical, when `POST /assets` stops listing the content
+types it accepts, or when a webhook field loses its enum.
+
+Small enums are generated too, not just the big schemas — accepted asset mime
+types and the four webhook fields. Both had drifted by hand more than once
+(`video` leaving the webhook `resource` list, `tool_job` joining it), which is
+exactly the kind of change that is easy to miss in a diff and silently rejects
+valid input.
 
 `scripts/test-layers.mjs` covers layer validation and the schema reference
 without hitting the API. `scripts/test-scopes.mjs` covers scope filtering

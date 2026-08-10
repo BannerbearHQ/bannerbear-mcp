@@ -77,6 +77,29 @@ check(
   `exempt but not registered: ${stale.join(", ")}`
 );
 
+// --- webhook enums track the spec -------------------------------------------
+const toolJobHook = await call("create_webhook", {
+  name: "h",
+  url: "https://x/hook",
+  resource: "tool_job",
+});
+check(
+  "create_webhook accepts the tool_job resource",
+  /Bannerbear API error/.test(toolJobHook.text),
+  `expected it to reach the API, got: ${toolJobHook.text.slice(0, 200)}`
+);
+
+const badResource = await call("create_webhook", {
+  name: "h",
+  url: "https://x/hook",
+  resource: "video",
+});
+check(
+  "create_webhook still rejects a resource the spec dropped",
+  badResource.isError && !/Bannerbear API error/.test(badResource.text),
+  badResource.text
+);
+
 // --- schema reference -------------------------------------------------------
 const overview = await call("get_layer_schema", {});
 check(

@@ -95,6 +95,18 @@ if (fingerprint(imageMods) !== fingerprint(batchMods)) {
 
 const imageFormats = body("/images").properties.formats.items.enum;
 
+// Webhook enums are small but have drifted twice — `video` left when video did,
+// `tool_job` arrived with /tools — so derive them rather than hand-maintaining.
+const webhookProps = body("/webhooks").properties;
+const webhookEnum = (key) => {
+  const values = webhookProps[key]?.enum;
+  if (!Array.isArray(values) || values.length === 0) {
+    console.error(`FATAL: POST /webhooks lost the enum on \`${key}\`.`);
+    process.exit(1);
+  }
+  return values;
+};
+
 // POST /assets declares what it accepts as request content types rather than in
 // a schema, so read the keys. Anything else comes back 415, and knowing the list
 // lets upload_asset reject locally instead of after pushing the bytes.
@@ -235,6 +247,12 @@ export const IMAGE_FORMATS = ${JSON.stringify(imageFormats)} as const;
 /** Content types POST /assets accepts; anything else is a 415. */
 export const ASSET_MIME_TYPES = ${JSON.stringify(assetMimeTypes)} as const;
 
+/** Webhook field enums, from POST /webhooks. */
+export const WEBHOOK_RESOURCES = ${JSON.stringify(webhookEnum("resource"))} as const;
+export const WEBHOOK_EVENTS = ${JSON.stringify(webhookEnum("event"))} as const;
+export const WEBHOOK_STATUSES = ${JSON.stringify(webhookEnum("status"))} as const;
+export const WEBHOOK_SCOPES = ${JSON.stringify(webhookEnum("scope"))} as const;
+
 /**
  * Attributes each layer type accepts. Used to catch attributes that belong to a
  * different layer type, without rejecting ones the spec simply hasn't caught up
@@ -265,5 +283,6 @@ console.log(
     `  ${Object.keys(typeToComponent).length} layer types: ${Object.keys(typeToComponent).join(", ")}\n` +
     `  ${baseKeys.length} shared base attributes\n` +
     `  ${Object.keys(modProps).length} modification attributes\n` +
-    `  ${assetMimeTypes.length} asset mime types: ${assetMimeTypes.join(", ")}`
+    `  ${assetMimeTypes.length} asset mime types: ${assetMimeTypes.join(", ")}\n` +
+    `  webhook resources: ${webhookEnum("resource").join(", ")}`
 );

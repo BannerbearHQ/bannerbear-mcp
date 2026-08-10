@@ -1,15 +1,30 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { BannerbearClient } from "../client.js";
+import {
+  WEBHOOK_EVENTS,
+  WEBHOOK_RESOURCES,
+  WEBHOOK_SCOPES,
+  WEBHOOK_STATUSES,
+} from "../generated/schemas.js";
 import { guard, pageParam } from "./common.js";
+
+/** The spec's enums are the source of truth; these have drifted twice already. */
+const asEnum = (values: readonly string[]) =>
+  z.enum(values as unknown as [string, ...string[]]);
 
 const webhookShape = {
   name: z.string().describe("Webhook name"),
   url: z.string().describe("URL to receive webhook events"),
-  resource: z.enum(["image", "batch"]).optional(),
-  event: z.enum(["all_events", "completed", "failed"]).optional(),
-  status: z.enum(["active", "disabled"]).optional(),
-  scope: z.enum(["all_templates", "specific_templates"]).optional(),
+  resource: asEnum(WEBHOOK_RESOURCES)
+    .optional()
+    .describe(
+      "Which kind of job fires this webhook — `tool_job` covers the media " +
+        "tools (remove_bg, trim_video, …)"
+    ),
+  event: asEnum(WEBHOOK_EVENTS).optional(),
+  status: asEnum(WEBHOOK_STATUSES).optional(),
+  scope: asEnum(WEBHOOK_SCOPES).optional(),
   templates: z
     .array(z.string())
     .optional()
