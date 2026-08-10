@@ -9,6 +9,7 @@ import { registerGenerationTools } from "./tools/generate.js";
 import { registerWorkspaceTools } from "./tools/workspace.js";
 import { registerAssetTools } from "./tools/assets.js";
 import { registerPublicationTools } from "./tools/publications.js";
+import { registerToolkitTools } from "./tools/toolkit.js";
 
 const apiKey = process.env.BANNERBEAR_API_KEY;
 if (!apiKey) {
@@ -64,6 +65,7 @@ registerTemplateTools(server, client);
 registerGenerationTools(server, client);
 registerAssetTools(server, client);
 registerPublicationTools(server, client);
+registerToolkitTools(server, client);
 
 (server as any).registerTool = registerTool;
 

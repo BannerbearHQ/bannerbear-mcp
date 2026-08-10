@@ -20,6 +20,14 @@ export const fail = (message: string): ToolResult => ({
   isError: true,
 });
 
+/** Renders a thrown error the way tool results report it. */
+export function describeError(err: unknown): string {
+  if (err instanceof BannerbearError) {
+    return `Bannerbear API error (${err.status}): ${err.message}`;
+  }
+  return `Unexpected error: ${(err as Error).message}`;
+}
+
 /**
  * Surfaces API failures as tool errors rather than throwing, so the model can
  * read the message and correct itself instead of the call disappearing.
@@ -28,10 +36,7 @@ export async function guard(fn: () => Promise<unknown>): Promise<ToolResult> {
   try {
     return ok(await fn());
   } catch (err) {
-    if (err instanceof BannerbearError) {
-      return fail(`Bannerbear API error (${err.status}): ${err.message}`);
-    }
-    return fail(`Unexpected error: ${(err as Error).message}`);
+    return fail(describeError(err));
   }
 }
 

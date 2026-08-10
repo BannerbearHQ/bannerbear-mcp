@@ -39,9 +39,9 @@ export function registerWorkspaceTools(
       title: "Get account info",
       description:
         "Workspace name, subscription plan and quota usage, plus what the API " +
-        "key in use is allowed to do: its scopes, any per-resource template " +
-        "allowlist, and any browser origin restrictions. Reachable on every " +
-        "key regardless of scope, so it also works as a connectivity check.",
+        "key in use is allowed to do: its scopes and any browser origin " +
+        "restrictions. Reachable on every key regardless of scope, so it also " +
+        "works as a connectivity check.",
       inputSchema: {},
     },
     async () => guard(() => client.request("GET", "/account"))

@@ -47,7 +47,7 @@ breaking changes without opting in.
 
 ## Tools
 
-29 tools covering all 29 V5 endpoints.
+38 tools covering all 38 V5 endpoints.
 
 | Group | Tools |
 | --- | --- |
@@ -58,12 +58,14 @@ breaking changes without opting in.
 | Batches | `create_batch`, `get_batch`, `list_batches` |
 | Assets | `upload_asset`, `check_assets`, `get_asset`, `list_assets` |
 | Publications | `list_publications`, `get_publication`, `install_publication` |
+| Media tools | `remove_bg`, `create_pdf`, `trim_video`, `crop_video`, `resize_video`, `concat_videos`, `overlay_image`, `overlay_video`, `get_tool_job` |
 | Webhooks | `list_webhooks`, `get_webhook`, `create_webhook`, `update_webhook`, `delete_webhook` |
 | Instant URLs | `list_instant_urls`, `get_instant_url`, `create_instant_url`, `update_instant_url`, `delete_instant_url` |
 
-Video support in V5 is planned for an upcoming release.
+The media tools operate on video, but *video templates* — designing and
+rendering video from a template, as image templates do — are still to come.
 
-A scoped API key sees fewer — see below.
+A scoped API key sees fewer tools — see below.
 
 ### Design notes
 
@@ -84,6 +86,23 @@ all leave the complete surface enabled — wrongly hiding a tool that would have
 worked is worse than letting a `403` speak for itself. `scripts/test-scopes.mjs`
 asserts each of those paths, and checks the scope table against the enum in the
 spec so a typo can't silently disable a tool.
+
+**Media tools are async, and polled to completion.** The `/tools` endpoints
+take URLs rather than templates — background removal, PDF assembly, and video
+trim/crop/resize/concat/overlay. Each answers `202` with a pending job, so the
+tools poll `/tool_jobs/{uid}` and return the finished output by default; pass
+`wait: false` to get the uid straight back and check it later with
+`get_tool_job`.
+
+These jobs run `pending → running → completed`, so the client's poll takes a
+predicate — stopping at "anything but pending" would return a job before it has
+an output. A job that ends `failed` is reported as a tool error carrying
+`error_message`, not as data: the HTTP call succeeded, so otherwise the model
+would have to notice a buried status field to know the work didn't happen.
+
+They have no scope of their own — the `/account` enum has no `tools:*` entry —
+so they can't be filtered by key and stay visible. `UNSCOPED_TOOLS` records
+that, and a test asserts every registered tool is either scoped or listed there.
 
 **Sync-first image generation.** `generate_image` posts to
 `sync.api.bannerbear.com` and returns the finished file in a single call. That
@@ -132,7 +151,7 @@ bag — so a conversation pays only for the types it actually uses:
 | `layer_type: "text"` | 4.6 KB |
 | `section: "modifications"` | 8.9 KB |
 
-Tool definitions total ~5.7k tokens.
+Tool definitions total ~8.0k tokens.
 
 **Layers are validated locally before the request goes out.** The tool schema
 carries the `type` enum, so a bad type is caught by the MCP layer. The handler

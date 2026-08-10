@@ -150,16 +150,22 @@ export class BannerbearClient {
   /**
    * Polls a resource until it leaves `pending`. Backs off from 1s to 5s so a
    * fast render returns promptly without hammering a slow one.
+   *
+   * `isDone` exists because tool jobs pass through `running` on the way to
+   * `completed`, so "anything but pending" would return a job that hasn't
+   * produced its output yet.
    */
   async pollUntilDone<T extends { status?: string; uid?: string }>(
     path: string,
-    timeoutMs = this.pollTimeoutMs
+    timeoutMs = this.pollTimeoutMs,
+    isDone: (result: T) => boolean = (result) =>
+      !!result.status && result.status !== "pending"
   ): Promise<T> {
     const deadline = Date.now() + timeoutMs;
     let delay = 1000;
     for (;;) {
       const result = await this.request<T>("GET", path);
-      if (result.status && result.status !== "pending") return result;
+      if (isDone(result)) return result;
       if (Date.now() >= deadline) {
         throw new BannerbearError(
           `Timed out after ${Math.round(timeoutMs / 1000)}s waiting for ${path}. ` +

@@ -56,6 +56,27 @@ const check = (label, pass, detail) => {
   }
 };
 
+// --- scope coverage ---------------------------------------------------------
+// Every registered tool must be scoped or explicitly exempt. Without this, a
+// new tool silently defaults to never being filtered.
+const { TOOL_SCOPES, UNSCOPED_TOOLS } = await import("../dist/scopes.js");
+const listed = await rpc("tools/list", {});
+const registered = listed.result.tools.map((t) => t.name);
+const unaccounted = registered
+  .filter((n) => !(n in TOOL_SCOPES) && !UNSCOPED_TOOLS.has(n))
+  .sort();
+check(
+  "every registered tool is scoped or explicitly exempt",
+  unaccounted.length === 0,
+  `no scope decision recorded for: ${unaccounted.join(", ")}`
+);
+const stale = [...UNSCOPED_TOOLS].filter((n) => !registered.includes(n)).sort();
+check(
+  "the exempt list has no entries for tools that no longer exist",
+  stale.length === 0,
+  `exempt but not registered: ${stale.join(", ")}`
+);
+
 // --- schema reference -------------------------------------------------------
 const overview = await call("get_layer_schema", {});
 check(
@@ -353,6 +374,65 @@ check(
 );
 
 rmSync(tmp, { recursive: true, force: true });
+
+// --- toolkit ----------------------------------------------------------------
+const trimMissing = await call("trim_video", { video_url: "https://x/v.mp4" });
+check(
+  "trim_video requires its timestamps",
+  trimMissing.isError && /start|Required/i.test(trimMissing.text),
+  trimMissing.text
+);
+
+const concatTooFew = await call("concat_videos", {
+  video_urls: ["https://x/a.mp4"],
+});
+check(
+  "concat_videos rejects a single input",
+  concatTooFew.isError,
+  concatTooFew.text
+);
+
+const badFit = await call("resize_video", {
+  video_url: "https://x/v.mp4",
+  width: 100,
+  height: 100,
+  fit: "squish",
+});
+check(
+  "resize_video rejects a fit outside the enum",
+  badFit.isError,
+  badFit.text
+);
+
+const badOpacity = await call("overlay_image", {
+  video_url: "https://x/v.mp4",
+  image_url: "https://x/l.png",
+  x: 0,
+  y: 0,
+  opacity: 5,
+});
+check(
+  "overlay_image bounds opacity to 0..1",
+  badOpacity.isError,
+  badOpacity.text
+);
+
+const removeBg = await call("remove_bg", {
+  image_url: "https://x/a.png",
+  wait: false,
+});
+check(
+  "remove_bg reaches the API",
+  /Bannerbear API error/.test(removeBg.text),
+  `expected an API-level error, got: ${removeBg.text.slice(0, 200)}`
+);
+
+const job = await call("get_tool_job", { uid: "abc" });
+check(
+  "get_tool_job reaches the API",
+  /Bannerbear API error/.test(job.text),
+  `expected an API-level error, got: ${job.text.slice(0, 200)}`
+);
 
 console.log(failures ? `\n${failures} failing` : "\nall checks passed");
 proc.kill();

@@ -2,12 +2,32 @@ import type { RegisteredTool } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { BannerbearClient } from "./client.js";
 
 /**
- * The scope each tool needs, from the `api_key.scopes` enum on GET /account.
+ * Tools that need no scope, listed so an unmapped tool is a deliberate choice
+ * rather than an oversight. `scripts/test-layers.mjs` asserts every registered
+ * tool appears here or in TOOL_SCOPES.
  *
- * `get_account` and `get_layer_schema` are deliberately absent: /account is
- * reachable on any key regardless of scope, and get_layer_schema is served from
- * the generated schema without touching the API. A tool missing from this map
- * is never disabled.
+ * /account is reachable on any key, and get_layer_schema is served from the
+ * generated schema without touching the API. The /tools endpoints have no
+ * scope of their own in the spec — there is no `tools:read`/`tools:write` in
+ * the enum — so they cannot be filtered and are left visible.
+ */
+export const UNSCOPED_TOOLS: ReadonlySet<string> = new Set([
+  "get_account",
+  "get_layer_schema",
+  "remove_bg",
+  "create_pdf",
+  "trim_video",
+  "crop_video",
+  "resize_video",
+  "concat_videos",
+  "overlay_image",
+  "overlay_video",
+  "get_tool_job",
+]);
+
+/**
+ * The scope each tool needs, from the `api_key.scopes` enum on GET /account.
+ * A tool missing from this map is never disabled; see UNSCOPED_TOOLS.
  */
 export const TOOL_SCOPES: Record<string, string> = {
   generate_image: "images:write",
