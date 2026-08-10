@@ -46,7 +46,7 @@ const client = new BannerbearClient({ apiKey });
 
 const server = new McpServer({
   name: "bannerbear",
-  version: "0.3.0",
+  version: "0.4.0",
 });
 
 // Capture each tool handle as it registers, so applyScopeFilter can disable a
