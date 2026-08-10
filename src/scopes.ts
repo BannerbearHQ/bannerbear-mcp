@@ -23,6 +23,7 @@ export const UNSCOPED_TOOLS: ReadonlySet<string> = new Set([
   "overlay_image",
   "overlay_video",
   "get_tool_job",
+  "list_tool_jobs",
 ]);
 
 /**

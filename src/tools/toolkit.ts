@@ -1,7 +1,14 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { BannerbearClient } from "../client.js";
-import { describeError, fail, guard, ok, type ToolResult } from "./common.js";
+import {
+  describeError,
+  fail,
+  guard,
+  ok,
+  pageParam,
+  type ToolResult,
+} from "./common.js";
 
 /**
  * Standalone media operations under /tools — they take URLs and return files,
@@ -12,6 +19,17 @@ import { describeError, fail, guard, ok, type ToolResult } from "./common.js";
 /** Jobs run pending → running → completed / failed. Only the last two are terminal. */
 const isTerminal = (job: { status?: string }) =>
   job.status === "completed" || job.status === "failed";
+
+/**
+ * Sent as part of the body, unlike wait/timeout_seconds which are stripped out
+ * before the request — the handler forwards everything it doesn't destructure.
+ */
+const metadataParam = {
+  metadata: z
+    .string()
+    .optional()
+    .describe("Arbitrary string stored with the run and returned on the job"),
+};
 
 const asyncParams = {
   wait: z
@@ -77,7 +95,11 @@ export function registerToolkitTools(
   ) =>
     server.registerTool(
       name,
-      { title, description, inputSchema: { ...inputSchema, ...asyncParams } },
+      {
+        title,
+        description,
+        inputSchema: { ...inputSchema, ...metadataParam, ...asyncParams },
+      },
       async ({ wait, timeout_seconds, ...body }: any) =>
         runTool(client, name, body, wait, timeout_seconds)
     );
@@ -194,5 +216,19 @@ export function registerToolkitTools(
       inputSchema: { uid: z.string().describe("Tool job UID") },
     },
     async ({ uid }) => guard(() => client.request("GET", `/tool_jobs/${uid}`))
+  );
+
+  server.registerTool(
+    "list_tool_jobs",
+    {
+      title: "List tool jobs",
+      description:
+        "List tool runs across every tool, newest first, 20 per page — use " +
+        "it to find a job whose uid wasn't kept, or to review recent runs and " +
+        "their outputs.",
+      inputSchema: { ...pageParam },
+    },
+    async ({ page }) =>
+      guard(() => client.request("GET", "/tool_jobs", { query: { page } }))
   );
 }

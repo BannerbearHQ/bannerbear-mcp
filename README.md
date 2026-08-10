@@ -47,7 +47,7 @@ breaking changes without opting in.
 
 ## Tools
 
-38 tools covering all 38 V5 endpoints.
+39 tools covering all 39 V5 endpoints.
 
 | Group | Tools |
 | --- | --- |
@@ -58,7 +58,7 @@ breaking changes without opting in.
 | Batches | `create_batch`, `get_batch`, `list_batches` |
 | Assets | `upload_asset`, `check_assets`, `get_asset`, `list_assets` |
 | Publications | `list_publications`, `get_publication`, `install_publication` |
-| Media tools | `remove_bg`, `create_pdf`, `trim_video`, `crop_video`, `resize_video`, `concat_videos`, `overlay_image`, `overlay_video`, `get_tool_job` |
+| Media tools | `remove_bg`, `create_pdf`, `trim_video`, `crop_video`, `resize_video`, `concat_videos`, `overlay_image`, `overlay_video`, `get_tool_job`, `list_tool_jobs` |
 | Webhooks | `list_webhooks`, `get_webhook`, `create_webhook`, `update_webhook`, `delete_webhook` |
 | Instant URLs | `list_instant_urls`, `get_instant_url`, `create_instant_url`, `update_instant_url`, `delete_instant_url` |
 
@@ -92,7 +92,9 @@ take URLs rather than templates — background removal, PDF assembly, and video
 trim/crop/resize/concat/overlay. Each answers `202` with a pending job, so the
 tools poll `/tool_jobs/{uid}` and return the finished output by default; pass
 `wait: false` to get the uid straight back and check it later with
-`get_tool_job`.
+`get_tool_job`. Every run takes an optional `metadata` string, returned on the
+job — handy for tying a result back to whatever triggered it. `list_tool_jobs`
+walks recent runs when a uid wasn't kept.
 
 These jobs run `pending → running → completed`, so the client's poll takes a
 predicate — stopping at "anything but pending" would return a job before it has
@@ -151,7 +153,7 @@ bag — so a conversation pays only for the types it actually uses:
 | `layer_type: "text"` | 4.6 KB |
 | `section: "modifications"` | 8.9 KB |
 
-Tool definitions total ~8.1k tokens.
+Tool definitions total ~8.5k tokens.
 
 **Layers are validated locally before the request goes out.** The tool schema
 carries the `type` enum, so a bad type is caught by the MCP layer. The handler

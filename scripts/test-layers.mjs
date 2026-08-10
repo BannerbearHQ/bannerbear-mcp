@@ -450,6 +450,34 @@ check(
   `expected an API-level error, got: ${removeBg.text.slice(0, 200)}`
 );
 
+const withMetadata = await call("remove_bg", {
+  image_url: "https://x/a.png",
+  metadata: "batch-42",
+  wait: false,
+});
+check(
+  "metadata is accepted and forwarded rather than stripped",
+  /Bannerbear API error/.test(withMetadata.text),
+  `expected it to reach the API, got: ${withMetadata.text.slice(0, 200)}`
+);
+
+const badMetadata = await call("remove_bg", {
+  image_url: "https://x/a.png",
+  metadata: { not: "a string" },
+});
+check(
+  "metadata must be a string",
+  badMetadata.isError && !/Bannerbear API error/.test(badMetadata.text),
+  badMetadata.text
+);
+
+const jobList = await call("list_tool_jobs", {});
+check(
+  "list_tool_jobs reaches the API",
+  /Bannerbear API error/.test(jobList.text),
+  `expected an API-level error, got: ${jobList.text.slice(0, 200)}`
+);
+
 const job = await call("get_tool_job", { uid: "abc" });
 check(
   "get_tool_job reaches the API",
