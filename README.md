@@ -47,7 +47,7 @@ breaking changes without opting in.
 
 ## Tools
 
-39 tools covering all 39 V5 endpoints.
+46 tools covering all 46 V5 endpoints.
 
 | Group | Tools |
 | --- | --- |
@@ -58,7 +58,7 @@ breaking changes without opting in.
 | Batches | `create_batch`, `get_batch`, `list_batches` |
 | Assets | `upload_asset`, `check_assets`, `get_asset`, `list_assets` |
 | Publications | `list_publications`, `get_publication`, `install_publication` |
-| Media tools | `remove_bg`, `create_pdf`, `trim_video`, `crop_video`, `resize_video`, `concat_videos`, `overlay_image`, `overlay_video`, `get_tool_job`, `list_tool_jobs` |
+| Media tools | `remove_bg`, `create_pdf`, `trim_video`, `crop_video`, `resize_video`, `concat_videos`, `overlay_image`, `overlay_video`, `add_audio`, `generate_voiceover`, `subtitle_video`, `create_video_slideshow`, `apply_color_filter`, `soften_video`, `add_cover_art`, `get_tool_job`, `list_tool_jobs` |
 | Webhooks | `list_webhooks`, `get_webhook`, `create_webhook`, `update_webhook`, `delete_webhook` |
 | Instant URLs | `list_instant_urls`, `get_instant_url`, `create_instant_url`, `update_instant_url`, `delete_instant_url` |
 
@@ -147,9 +147,13 @@ an output. A job that ends `failed` is reported as a tool error carrying
 `error_message`, not as data: the HTTP call succeeded, so otherwise the model
 would have to notice a buried status field to know the work didn't happen.
 
-They have no scope of their own — the `/account` enum has no `tools:*` entry —
-so they can't be filtered by key and stay visible. `UNSCOPED_TOOLS` records
-that, and a test asserts every registered tool is either scoped or listed there.
+They gate on `tools:write` to dispatch a job and `tools:read` to read one back,
+so a key without them sees a shorter list rather than a wall of `403`s. Only
+`get_account` and `get_layer_schema` are unscoped now — the first is reachable
+on any key, the second never touches the API. `UNSCOPED_TOOLS` records that
+pair, and a test asserts every registered tool is either scoped or listed there,
+which is what caught the media tools the moment the spec gained a scope for
+them.
 
 **Sync-first image generation.** `generate_image` posts to
 `sync.api.bannerbear.com` and returns the finished file in a single call. That
@@ -198,7 +202,7 @@ bag — so a conversation pays only for the types it actually uses:
 | `layer_type: "text"` | 4.6 KB |
 | `section: "modifications"` | 8.9 KB |
 
-Tool definitions total ~8.5k tokens.
+Tool definitions total ~11.1k tokens.
 
 **Layers are validated locally before the request goes out.** The tool schema
 carries the `type` enum, so a bad type is caught by the MCP layer. The handler
@@ -219,6 +223,12 @@ window would restart empty each time and never throttle. `src/http.ts` keeps one
 per key and hands it to every request acting as that key. It is still per
 process, so several instances under-count; the server-side limit remains the
 real ceiling and the backoff above is what respects it.
+
+**Templates can be locked against the API.** `api_write_access` decides who may
+update or delete a template — `team` by default, `owner_only` for the creator's
+keys, or `nobody` to block the API entirely until it is unlocked in the
+dashboard. Writes to a locked template come back `403` or `423`; `get_template`
+reports the current setting, and neither field is writable through the API.
 
 **Upserts.** Create and update are one tool — omit `uid` to create, pass it to
 update. Requests and responses both use `config.objects`, so what

@@ -204,7 +204,10 @@ export function registerTemplateTools(
       title: "Create or update an image template",
       description:
         "Create a new image template, or update an existing one by passing " +
-        "uid. " +
+        "uid. Updating can be refused by the template's own lock: " +
+        "`api_write_access` of `owner_only` restricts writes to the creator's " +
+        "keys, and `nobody` blocks the API entirely until it's unlocked in the " +
+        "dashboard. get_template reports it. " +
         SCHEMA_HINT,
       inputSchema: {
         uid: z
@@ -252,7 +255,10 @@ export function registerTemplateTools(
     "delete_template",
     {
       title: "Delete a template",
-      description: "Permanently delete an image template.",
+      description:
+        "Permanently delete an image template. Subject to the same " +
+        "`api_write_access` lock as updating: `owner_only` restricts this to " +
+        "the creator's keys, `nobody` blocks it until unlocked in the dashboard.",
       inputSchema: { uid: z.string().describe("Template UID") },
     },
     async ({ uid }) =>

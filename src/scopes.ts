@@ -7,23 +7,11 @@ import type { BannerbearClient } from "./client.js";
  * tool appears here or in TOOL_SCOPES.
  *
  * /account is reachable on any key, and get_layer_schema is served from the
- * generated schema without touching the API. The /tools endpoints have no
- * scope of their own in the spec — there is no `tools:read`/`tools:write` in
- * the enum — so they cannot be filtered and are left visible.
+ * generated schema without touching the API.
  */
 export const UNSCOPED_TOOLS: ReadonlySet<string> = new Set([
   "get_account",
   "get_layer_schema",
-  "remove_bg",
-  "create_pdf",
-  "trim_video",
-  "crop_video",
-  "resize_video",
-  "concat_videos",
-  "overlay_image",
-  "overlay_video",
-  "get_tool_job",
-  "list_tool_jobs",
 ]);
 
 /**
@@ -67,6 +55,28 @@ export const TOOL_SCOPES: Record<string, string> = {
   list_publications: "publications:read",
   get_publication: "publications:read",
   install_publication: "publications:write",
+
+  // Each media tool dispatches a job, so they count as writes; reading a job
+  // back is a read. These were unscoped until the spec gained tools:read and
+  // tools:write, and a key without them now sees a narrower list rather than
+  // a wall of 403s.
+  remove_bg: "tools:write",
+  create_pdf: "tools:write",
+  trim_video: "tools:write",
+  crop_video: "tools:write",
+  resize_video: "tools:write",
+  concat_videos: "tools:write",
+  overlay_image: "tools:write",
+  overlay_video: "tools:write",
+  add_audio: "tools:write",
+  generate_voiceover: "tools:write",
+  subtitle_video: "tools:write",
+  create_video_slideshow: "tools:write",
+  apply_color_filter: "tools:write",
+  soften_video: "tools:write",
+  add_cover_art: "tools:write",
+  get_tool_job: "tools:read",
+  list_tool_jobs: "tools:read",
 };
 
 /**

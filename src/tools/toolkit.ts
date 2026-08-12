@@ -218,6 +218,155 @@ export function registerToolkitTools(
     }
   );
 
+  asyncTool(
+    "add_audio",
+    "Add or replace a video's audio",
+    "Mix an audio track over a video, or replace the original entirely. " +
+      "Pair with generate_voiceover to narrate a clip.",
+    {
+      video_url: videoUrl,
+      audio_url: z.string().describe("Audio URL"),
+      mode: z
+        .enum(["mix", "replace"])
+        .default("mix")
+        .describe("mix keeps the original audio underneath; replace discards it"),
+      volume: z.number().optional().describe("1.0 is the original level"),
+      loop: z
+        .enum(["on", "off"])
+        .optional()
+        .describe("Loop the audio to the video's length. Off for one-shot sounds."),
+      ducking: z
+        .enum(["off", "subtle", "medium", "heavy"])
+        .optional()
+        .describe("Dip the new audio under the original. Mix mode only."),
+    }
+  );
+
+  asyncTool(
+    "generate_voiceover",
+    "Generate a voiceover",
+    "Turn text into spoken audio. Returns an audio URL — feed it to add_audio " +
+      "to lay it over a video.",
+    {
+      text: z.string().max(2000).describe("What the voice should say, up to 2000 characters"),
+      voice: z
+        .enum([
+          "rachel", "adam", "antoni", "bella", "domi",
+          "elli", "josh", "arnold", "charlie", "freya",
+        ])
+        .default("rachel")
+        .describe("Pre-made voice. rachel and adam are safe defaults."),
+    }
+  );
+
+  asyncTool(
+    "subtitle_video",
+    "Transcribe and burn in subtitles",
+    "Auto-transcribe a video's audio and burn styled subtitles onto it. " +
+      "Leave language unset to auto-detect, which works well on clear audio.",
+    {
+      video_url: videoUrl,
+      language: z
+        .enum([
+          "", "en", "es", "fr", "de", "it", "pt", "nl", "ru", "pl",
+          "tr", "ar", "hi", "zh", "ja", "ko", "id", "vi", "th",
+        ])
+        .optional()
+        .describe("Spoken language; omit or pass \"\" to auto-detect"),
+      font: z
+        .enum([
+          "inter", "roboto", "open-sans", "noto-sans", "montserrat",
+          "poppins", "bebas-neue", "anton", "oswald", "playfair-display",
+        ])
+        .optional(),
+      font_size: z.number().int().optional().describe("Defaults to 28"),
+      color: z.string().optional().describe("Text colour, defaults to #ffffff"),
+      bold: z.enum(["off", "on"]).optional(),
+      italic: z.enum(["off", "on"]).optional(),
+      outline_color: z.string().optional().describe("Defaults to #000000"),
+      outline_width: z.number().int().optional().describe("0 for no outline"),
+      shadow_size: z.number().int().optional().describe("0 for no shadow"),
+      shadow_color: z.string().optional().describe("Defaults to #000000"),
+      background_style: z
+        .enum(["outline", "box", "none"])
+        .optional()
+        .describe("outline is classic subtitles; box paints a solid panel behind"),
+      background_color: z
+        .string()
+        .optional()
+        .describe("Only used when background_style is box"),
+      alignment: z
+        .enum(["1", "2", "3", "4", "5", "6", "7", "8", "9"])
+        .optional()
+        .describe("Numpad position, 2 is bottom-centre and the default"),
+    }
+  );
+
+  asyncTool(
+    "create_video_slideshow",
+    "Build a slideshow from images",
+    "Turn a series of images into an mp4 slideshow, optionally with " +
+      "transitions between slides.",
+    {
+      image_urls: z
+        .array(z.string())
+        .min(2)
+        .describe("Two or more image URLs, in slide order"),
+      slide_duration: z.number().optional().describe("Seconds per slide, defaults to 3"),
+      transition: z
+        .enum(["none", "fade", "dissolve", "wipeleft", "slideleft"])
+        .optional()
+        .describe("How each slide flows into the next, defaults to none"),
+      transition_duration: z
+        .number()
+        .optional()
+        .describe("Seconds, only used when transition is set. Defaults to 1."),
+      width: z.number().int().optional().describe("Defaults to 1280"),
+      height: z.number().int().optional().describe("Defaults to 720"),
+    }
+  );
+
+  asyncTool(
+    "apply_color_filter",
+    "Apply a colour filter to a video",
+    "Apply a named colour-grade preset to a video.",
+    {
+      video_url: videoUrl,
+      filter: z
+        .enum([
+          "black-and-white", "sepia", "invert", "warm", "cool", "vivid",
+          "muted", "dark-and-moody", "faded", "vintage", "cross-process",
+          "teal-and-orange", "bleach-bypass",
+        ])
+        .default("vintage")
+        .describe("Preset colour grade"),
+    }
+  );
+
+  asyncTool(
+    "soften_video",
+    "Soften a video",
+    "Smooth skin and flat surfaces while keeping edges sharp.",
+    {
+      video_url: videoUrl,
+      strength: z
+        .enum(["subtle", "medium", "strong"])
+        .default("medium")
+        .describe("How much smoothing to apply"),
+    }
+  );
+
+  asyncTool(
+    "add_cover_art",
+    "Set a video's poster image",
+    "Embed a still as the video's poster thumbnail. No re-encode, so this is " +
+      "quick and lossless.",
+    {
+      video_url: videoUrl,
+      image_url: z.string().describe("Cover image URL"),
+    }
+  );
+
   server.registerTool(
     "get_tool_job",
     {
