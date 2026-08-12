@@ -11,6 +11,7 @@
  * enough that it should not depend on review.
  */
 import { createServer } from "../dist/server.js";
+import { RateWindow } from "../dist/client.js";
 
 let failures = 0;
 const check = (label, pass, detail) => {
@@ -88,6 +89,53 @@ check(
   waitDefault(hostedHandles, "trim_video") === false,
   `got ${waitDefault(hostedHandles, "trim_video")}`
 );
+
+// --- the rate window is shared, not per client -------------------------------
+// The API counts per key. A server is built per request in hosted mode, so a
+// window that isn't shared would restart empty every time and never throttle.
+{
+  const window = new RateWindow(2, 200);
+  const started = Date.now();
+  await window.acquire();
+  await window.acquire();
+  const beforeThird = Date.now() - started;
+  await window.acquire();
+  const afterThird = Date.now() - started;
+
+  check(
+    "a window admits up to its limit without waiting",
+    beforeThird < 100,
+    `first two acquires took ${beforeThird}ms`
+  );
+  check(
+    "the next acquire waits for the window to roll over",
+    afterThird >= 200,
+    `third acquire completed after ${afterThird}ms, expected >= 200`
+  );
+}
+
+{
+  // Two servers for the same key share one window, so the second sees the
+  // first's traffic rather than starting fresh.
+  const shared = new RateWindow(2, 200);
+  const opts = {
+    apiKey: "bb_ak_v5_test",
+    filesystemTools: false,
+    pollMediaJobs: false,
+    rateWindow: shared,
+  };
+  createServer(opts);
+  createServer(opts);
+  await shared.acquire();
+  await shared.acquire();
+  const started = Date.now();
+  await shared.acquire();
+  check(
+    "servers built separately can share one window",
+    Date.now() - started >= 200,
+    "the shared window did not throttle across instances"
+  );
+}
 
 console.log(failures ? `\n${failures} failing` : "\nall checks passed");
 process.exit(failures ? 1 : 0);

@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import { RateWindow } from "./client.js";
 import { createServer, normalizeEmptyArguments } from "./server.js";
 
 /**
@@ -34,11 +35,43 @@ const SCOPE_TTL_MS = 5 * 60_000;
 const scopeChecked = new Map<string, number>();
 
 function shouldRefreshScopes(apiKey: string, now: number): boolean {
-  const id = createHash("sha256").update(apiKey).digest("hex");
+  const id = keyId(apiKey);
   const last = scopeChecked.get(id);
   if (last !== undefined && now - last < SCOPE_TTL_MS) return false;
   scopeChecked.set(id, now);
   return true;
+}
+
+const keyId = (apiKey: string) =>
+  createHash("sha256").update(apiKey).digest("hex");
+
+/**
+ * One rate-limit window per key, shared by every request acting as that key.
+ *
+ * A server is built per request here, so without this each request would get a
+ * fresh window, never fill it, and never throttle — the exact case the limiter
+ * exists for, since one caller's batch can fan out across several concurrent
+ * requests. The window is still per process, so with more than one instance the
+ * client-side view under-counts; the server-side limit stays the real ceiling
+ * and 429s are already retried with backoff.
+ */
+const rateWindows = new Map<string, RateWindow>();
+
+function windowFor(apiKey: string): RateWindow {
+  const id = keyId(apiKey);
+  let window = rateWindows.get(id);
+  if (!window) {
+    window = new RateWindow();
+    rateWindows.set(id, window);
+  }
+  // Drop windows for keys that have gone quiet, so the map tracks active
+  // tenants rather than every key ever seen.
+  if (rateWindows.size > 512) {
+    for (const [otherId, other] of rateWindows) {
+      if (otherId !== id && other.idle) rateWindows.delete(otherId);
+    }
+  }
+  return window;
 }
 
 export interface HandlerOptions {
@@ -81,6 +114,7 @@ export function createHandler(opts: HandlerOptions = {}) {
       // A hosted process may be recycled mid-job; the work continues at
       // Bannerbear either way, so hand back the uid and let them poll.
       pollMediaJobs: false,
+      rateWindow: windowFor(apiKey),
     });
 
     const transport = new StreamableHTTPServerTransport({

@@ -26,37 +26,68 @@ export class SyncTimeoutError extends Error {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+/**
+ * Sliding window over recent request times.
+ *
+ * Extracted from the client so several clients can share one. The API counts
+ * per key, so every request authenticating as the same key belongs in the same
+ * window — which matters wherever a client is built per request rather than
+ * per process, since a fresh window per client would never fill up and the
+ * throttle would silently stop working.
+ */
+export class RateWindow {
+  private recent: number[] = [];
+
+  constructor(
+    private readonly limit = RATE_LIMIT,
+    private readonly windowMs = RATE_WINDOW_MS
+  ) {}
+
+  /** True when nothing recent is recorded, so the window can be discarded. */
+  get idle(): boolean {
+    const now = Date.now();
+    return this.recent.every((t) => now - t >= this.windowMs);
+  }
+
+  /** Blocks until sending another request stays within the window. */
+  async acquire(): Promise<void> {
+    for (;;) {
+      const now = Date.now();
+      this.recent = this.recent.filter((t) => now - t < this.windowMs);
+      if (this.recent.length < this.limit) {
+        this.recent.push(now);
+        return;
+      }
+      await sleep(this.windowMs - (now - this.recent[0]) + 50);
+    }
+  }
+}
+
 export interface ClientOptions {
   apiKey: string;
   /** Overall ceiling for polled operations. */
   pollTimeoutMs?: number;
+  /**
+   * Window to count against. Pass a shared one when several clients act as the
+   * same key; omit for a private window, which is right when the process
+   * serves a single key for its lifetime.
+   */
+  rateWindow?: RateWindow;
 }
 
 export class BannerbearClient {
   private readonly apiKey: string;
   private readonly pollTimeoutMs: number;
-  /** Timestamps of recent requests, used as a sliding-window limiter. */
-  private recent: number[] = [];
+  /**
+   * Batches queue up to 100 items, so staying under the documented window is
+   * load-bearing rather than defensive.
+   */
+  private readonly rate: RateWindow;
 
   constructor(opts: ClientOptions) {
     this.apiKey = opts.apiKey;
     this.pollTimeoutMs = opts.pollTimeoutMs ?? 120_000;
-  }
-
-  /**
-   * Blocks until sending another request stays within the documented window.
-   * Batches can queue up to 100 items, so this is load-bearing, not defensive.
-   */
-  private async throttle(): Promise<void> {
-    for (;;) {
-      const now = Date.now();
-      this.recent = this.recent.filter((t) => now - t < RATE_WINDOW_MS);
-      if (this.recent.length < RATE_LIMIT) {
-        this.recent.push(now);
-        return;
-      }
-      await sleep(RATE_WINDOW_MS - (now - this.recent[0]) + 50);
-    }
+    this.rate = opts.rateWindow ?? new RateWindow();
   }
 
   async request<T = any>(
@@ -82,7 +113,7 @@ export class BannerbearClient {
 
     const maxAttempts = 4;
     for (let attempt = 1; ; attempt++) {
-      await this.throttle();
+      await this.rate.acquire();
 
       let res: Response;
       try {

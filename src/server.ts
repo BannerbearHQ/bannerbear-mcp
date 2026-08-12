@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { RegisteredTool } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
-import { BannerbearClient } from "./client.js";
+import { BannerbearClient, type RateWindow } from "./client.js";
 import { applyScopeFilter } from "./scopes.js";
 import { registerTemplateTools } from "./tools/templates.js";
 import { registerGenerationTools } from "./tools/generate.js";
@@ -35,6 +35,13 @@ export interface ServerOptions {
    * nothing, while a dropped poll loses a finished render.
    */
   pollMediaJobs: boolean;
+  /**
+   * Rate-limit window to count against. The API counts per key, so callers
+   * that build a server per request must pass the same window for the same
+   * key — otherwise every request starts with an empty window and the throttle
+   * never engages. Omit when the process serves one key for its lifetime.
+   */
+  rateWindow?: RateWindow;
 }
 
 export interface BannerbearServer {
@@ -60,7 +67,10 @@ export interface BannerbearServer {
  * these per request rather than per process.
  */
 export function createServer(opts: ServerOptions): BannerbearServer {
-  const client = new BannerbearClient({ apiKey: opts.apiKey });
+  const client = new BannerbearClient({
+    apiKey: opts.apiKey,
+    rateWindow: opts.rateWindow,
+  });
   const server = new McpServer({ name: "bannerbear", version: VERSION });
 
   // Capture each tool handle as it registers. The SDK keeps its registry

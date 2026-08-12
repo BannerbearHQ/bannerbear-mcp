@@ -213,6 +213,13 @@ through, so the server doesn't block on a spec that trails the API.
 30 requests / 10s, and retries `429` and `5xx` with backoff, honouring
 `Retry-After`. This matters for batches, which take up to 100 items.
 
+The window is a separate object rather than client state, because the limit is
+counted per API key and hosted mode builds a client per request — an unshared
+window would restart empty each time and never throttle. `src/http.ts` keeps one
+per key and hands it to every request acting as that key. It is still per
+process, so several instances under-count; the server-side limit remains the
+real ceiling and the backoff above is what respects it.
+
 **Upserts.** Create and update are one tool — omit `uid` to create, pass it to
 update. Requests and responses both use `config.objects`, so what
 `get_template` returns can be sent straight back. `config` replaces wholesale,
