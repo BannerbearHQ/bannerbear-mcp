@@ -61,7 +61,10 @@ export function registerGenerationTools(
       description:
         "Render an image from a template and return the finished file URLs. " +
         "Uses the synchronous endpoint so most images come back in this one " +
-        "call; slow renders fall back to async polling automatically.",
+        "call; slow renders fall back to async polling automatically. " +
+        "Rendering many at once? Use create_batch instead — it takes 100 per " +
+        "request, where calling this in a loop is one request each and will " +
+        "be throttled long before it finishes.",
       inputSchema: {
         ...imageCreateShape,
         wait: z
