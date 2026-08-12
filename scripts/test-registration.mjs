@@ -11,7 +11,7 @@
  * enough that it should not depend on review.
  */
 import { createServer } from "../dist/server.js";
-import { RateWindow } from "../dist/client.js";
+import { RateWindow, isRateLimitedMethod } from "../dist/client.js";
 
 let failures = 0;
 const check = (label, pass, detail) => {
@@ -88,6 +88,20 @@ check(
   "hosted returns the job uid instead of holding a poll",
   waitDefault(hostedHandles, "trim_video") === false,
   `got ${waitDefault(hostedHandles, "trim_video")}`
+);
+
+// --- only POST is metered ----------------------------------------------------
+// Polling is all GETs and is the highest-frequency traffic the client makes;
+// counting it would throttle a render behind its own status checks.
+check(
+  "POST counts against the window",
+  isRateLimitedMethod("POST") && isRateLimitedMethod("post"),
+  "POST was not treated as metered"
+);
+check(
+  "reads and updates do not count",
+  ["GET", "PATCH", "DELETE", "PUT"].every((m) => !isRateLimitedMethod(m)),
+  `unexpectedly metered: ${["GET", "PATCH", "DELETE", "PUT"].filter(isRateLimitedMethod).join(", ")}`
 );
 
 // --- the rate window is shared, not per client -------------------------------

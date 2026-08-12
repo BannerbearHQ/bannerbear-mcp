@@ -5,6 +5,16 @@ const SYNC_BASE = "https://sync.api.bannerbear.com/v5";
 const RATE_LIMIT = 28;
 const RATE_WINDOW_MS = 10_000;
 
+/**
+ * Only POST is metered; reads and updates are unlimited.
+ *
+ * This matters more than it looks. Polling is all GETs, and it is by far the
+ * most frequent thing the client does — a single job can poll for minutes.
+ * Counting those would spend a budget they were never charged against, and
+ * throttle a render behind its own status checks.
+ */
+const isMetered = (method: string) => method.toUpperCase() === "POST";
+
 export class BannerbearError extends Error {
   constructor(
     message: string,
@@ -35,6 +45,9 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
  * per process, since a fresh window per client would never fill up and the
  * throttle would silently stop working.
  */
+/** Exported for tests: which methods count against the window. */
+export const isRateLimitedMethod = isMetered;
+
 export class RateWindow {
   private recent: number[] = [];
 
@@ -112,8 +125,11 @@ export class BannerbearClient {
     }
 
     const maxAttempts = 4;
+    const metered = isMetered(method);
     for (let attempt = 1; ; attempt++) {
-      await this.rate.acquire();
+      // Inside the retry loop on purpose: a retried POST is another POST, and
+      // is counted again server-side.
+      if (metered) await this.rate.acquire();
 
       let res: Response;
       try {

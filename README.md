@@ -213,16 +213,29 @@ call. Attributes belonging to a *different* layer type are rejected by name
 belongs to "qr_code"`), while attributes the spec doesn't know about are passed
 through, so the server doesn't block on a spec that trails the API.
 
-**Rate limiting.** The client holds a sliding window just under the documented
-30 requests / 10s, and retries `429` and `5xx` with backoff, honouring
-`Retry-After`. This matters for batches, which take up to 100 items.
+**Rate limiting.** The limit is 30 requests / 10s and applies to `POST` only —
+reads and updates are unmetered. The client holds a sliding window just under
+that and counts `POST`s against it, so a caller stays inside the limit without
+having to think about it.
+
+Only metering `POST` matters more than it sounds. Polling is all `GET`s and is
+the most frequent thing the client does — a video job can poll for minutes — so
+counting it would spend budget that was never charged, and throttle a render
+behind its own status checks.
 
 The window is a separate object rather than client state, because the limit is
 counted per API key and hosted mode builds a client per request — an unshared
 window would restart empty each time and never throttle. `src/http.ts` keeps one
-per key and hands it to every request acting as that key. It is still per
-process, so several instances under-count; the server-side limit remains the
-real ceiling and the backoff above is what respects it.
+per key and hands it to every request acting as that key.
+
+It is a courtesy, not a guarantee. The window is per process, so several
+instances under-count, and it cannot see the same key being used by your own
+app at the same time. The server-side limit stays the real ceiling: `429` and
+`5xx` are retried with backoff, honouring `Retry-After`.
+
+One request shape is worth knowing: `create_batch` queues up to 100 images as a
+single `POST`, where the equivalent `generate_image` loop would be 100. The tool
+description says so, so the model reaches for it unprompted.
 
 **Templates can be locked against the API.** `api_write_access` decides who may
 update or delete a template — `team` by default, `owner_only` for the creator's

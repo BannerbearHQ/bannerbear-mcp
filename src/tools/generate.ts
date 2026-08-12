@@ -118,7 +118,9 @@ export function registerGenerationTools(
       title: "Create a batch of images",
       description:
         "Queue up to 100 images in a single request. Returns the batch uid; " +
-        "poll it with get_batch.",
+        "poll it with get_batch. Prefer this over repeated generate_image " +
+        "calls for more than a handful: the whole batch is one request against " +
+        "the rate limit, where the equivalent loop would be one per image.",
       inputSchema: {
         items: z
           .array(z.object(imageCreateShape).partial({ formats: true }))
