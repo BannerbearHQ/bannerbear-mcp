@@ -67,6 +67,51 @@ rendering video from a template, as image templates do — are still to come.
 
 A scoped API key sees fewer tools — see below.
 
+### Running it as a hosted endpoint
+
+The same tools serve two shapes. `dist/index.js` is the stdio binary above.
+`dist/serve.js` is an HTTP entry point over Streamable HTTP:
+
+```sh
+PORT=3000 MCP_PUBLIC_HOST=your-app.example.com npm run serve
+```
+
+`Procfile` points at it for platforms that read one. Auth is a single seam —
+`ResolveApiKey` in `src/http.ts` — which defaults to treating
+`Authorization: Bearer <key>` as the Bannerbear key. Swapping in an OAuth token
+exchange touches nothing else.
+
+`MCP_PUBLIC_HOST` must match the `Host` header exactly, including a port if the
+port is non-default, or the DNS-rebinding check rejects the request with `403`.
+
+Hosted mode differs from stdio in three ways, all of them deliberate:
+
+- **`upload_asset` and `check_assets` are not registered.** Both resolve a
+  caller-supplied path on the machine running the server. Over stdio that is
+  the caller's own disk, which is the point. Hosted it is *your* disk, so
+  `upload_asset` would copy any readable file into the caller's workspace and
+  return a CDN URL for it, and `check_assets` would still confirm a path's
+  existence and contents by hash. `get_asset` and `list_assets` take a uid and
+  a page, touch no disk, and stay.
+- **The media tools return a job uid instead of polling.** A hosted process can
+  be recycled mid-job. The work continues at Bannerbear regardless, so handing
+  back the uid loses nothing, while a dropped poll loses a finished render.
+  Callers use `get_tool_job`.
+- **One server and client per request, never per process.** The rate-limit
+  window and the tool registry that scope filtering mutates both live on the
+  instance. Sharing one would let a single scoped key disable tools for every
+  user, and one caller's burst throttle everyone else.
+
+The transport streams over SSE rather than buffering a JSON response, which is
+load-bearing behind a router that times out an idle request: the response starts
+immediately and heartbeats while a job runs. Setting `enableJsonResponse` would
+send nothing until the work finished and reintroduce that timeout.
+
+Sessions are stateless (`sessionIdGenerator: undefined`), so no affinity is
+needed and nothing is lost when a process restarts. Scope lookups are cached for
+five minutes, keyed by a digest of the API key, so rebuilding per request does
+not mean an `/account` call per request.
+
 ### Design notes
 
 **Tools narrow to the key's scopes.** `GET /account` reports the scopes the API
@@ -203,5 +248,11 @@ valid input.
 
 `scripts/test-layers.mjs` covers layer validation and the schema reference
 without hitting the API. `scripts/test-scopes.mjs` covers scope filtering
-against stub tool handles, including every fail-open path. Both run under
-`npm test`.
+against stub tool handles, including every fail-open path.
+`scripts/test-registration.mjs` covers what each deployment shape registers —
+above all that hosted mode omits the two filesystem tools, since that failure
+is silent and hands out arbitrary file reads. All three run under `npm test`.
+
+`src/server.ts` builds a server bound to one key and knows nothing about
+transports; `src/index.ts` and `src/serve.ts` are the two entry points. Adding a
+tool means touching a module under `src/tools/`, not either entry point.

@@ -31,10 +31,10 @@ const metadataParam = {
     .describe("Arbitrary string stored with the run and returned on the job"),
 };
 
-const asyncParams = {
+const asyncParams = (pollByDefault: boolean) => ({
   wait: z
     .boolean()
-    .default(true)
+    .default(pollByDefault)
     .describe(
       "Wait for the job to finish. Set false to get the job uid back " +
         "immediately and poll it yourself with get_tool_job."
@@ -46,7 +46,7 @@ const asyncParams = {
     .max(900)
     .default(300)
     .describe("How long to poll before handing back the uid to check later"),
-};
+});
 
 /**
  * A failed job is reported as a tool error rather than as data. The HTTP call
@@ -83,10 +83,22 @@ async function runTool(
 
 const videoUrl = z.string().describe("Video URL");
 
+export interface ToolkitOptions {
+  /**
+   * Whether the media tools poll to completion by default. False where the
+   * process may be recycled mid-job: the work continues at Bannerbear either
+   * way, so returning the uid loses nothing while a dropped poll loses a
+   * finished render.
+   */
+  pollByDefault: boolean;
+}
+
 export function registerToolkitTools(
   server: McpServer,
-  client: BannerbearClient
+  client: BannerbearClient,
+  opts: ToolkitOptions
 ) {
+  const shared = asyncParams(opts.pollByDefault);
   const asyncTool = (
     name: string,
     title: string,
@@ -98,7 +110,7 @@ export function registerToolkitTools(
       {
         title,
         description,
-        inputSchema: { ...inputSchema, ...metadataParam, ...asyncParams },
+        inputSchema: { ...inputSchema, ...metadataParam, ...shared },
       },
       async ({ wait, timeout_seconds, ...body }: any) =>
         runTool(client, name, body, wait, timeout_seconds)

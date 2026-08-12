@@ -57,7 +57,53 @@ const MIME_BY_EXT: Record<string, string> = {
   ".otf": "font/otf",
 };
 
-export function registerAssetTools(server: McpServer, client: BannerbearClient) {
+export interface AssetToolOptions {
+  /**
+   * Register the tools that read this machine's filesystem. False wherever the
+   * caller isn't on this machine — a path argument would then address the
+   * server's disk on their behalf.
+   */
+  filesystem: boolean;
+}
+
+export function registerAssetTools(
+  server: McpServer,
+  client: BannerbearClient,
+  opts: AssetToolOptions
+) {
+  // get_asset and list_asset take a uid and a page, touch no disk, and are
+  // registered either way. Only the two that resolve a caller-supplied path
+  // are gated.
+  if (opts.filesystem) registerFilesystemTools(server, client);
+
+  server.registerTool(
+    "get_asset",
+    {
+      title: "Get an asset",
+      description: "Retrieve one uploaded asset by uid, including its CDN URL.",
+      inputSchema: { uid: z.string() },
+    },
+    async ({ uid }) => guard(() => client.request("GET", `/assets/${uid}`))
+  );
+
+  server.registerTool(
+    "list_assets",
+    {
+      title: "List assets",
+      description:
+        "List files uploaded by this workspace, newest first — use it to find " +
+        "the CDN URL of something uploaded earlier instead of uploading again.",
+      inputSchema: { ...pageParam },
+    },
+    async ({ page }) =>
+      guard(() => client.request("GET", "/assets", { query: { page } }))
+  );
+}
+
+function registerFilesystemTools(
+  server: McpServer,
+  client: BannerbearClient
+) {
   server.registerTool(
     "upload_asset",
     {
@@ -187,28 +233,5 @@ export function registerAssetTools(server: McpServer, client: BannerbearClient) 
         });
       });
     }
-  );
-
-  server.registerTool(
-    "get_asset",
-    {
-      title: "Get an asset",
-      description: "Retrieve one uploaded asset by uid, including its CDN URL.",
-      inputSchema: { uid: z.string() },
-    },
-    async ({ uid }) => guard(() => client.request("GET", `/assets/${uid}`))
-  );
-
-  server.registerTool(
-    "list_assets",
-    {
-      title: "List assets",
-      description:
-        "List files uploaded by this workspace, newest first — use it to find " +
-        "the CDN URL of something uploaded earlier instead of uploading again.",
-      inputSchema: { ...pageParam },
-    },
-    async ({ page }) =>
-      guard(() => client.request("GET", "/assets", { query: { page } }))
   );
 }
