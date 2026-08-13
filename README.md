@@ -83,6 +83,13 @@ exchange touches nothing else.
 
 `MCP_PUBLIC_HOST` must match the `Host` header exactly, including a port if the
 port is non-default, or the DNS-rebinding check rejects the request with `403`.
+It takes a comma-separated list, which is worth setting when a deployment is
+reachable by more than one name — reaching the origin directly as well as
+through a CDN is how a proxy problem gets told apart from an origin one:
+
+```sh
+MCP_PUBLIC_HOST=mcp.example.com,my-app.herokuapp.com
+```
 
 `GET /health` answers `200` unauthenticated with the running version, so a
 deployment can be told apart from an outage. Everything else without a

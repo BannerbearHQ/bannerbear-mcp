@@ -25,6 +25,15 @@ export const bearerApiKey: ResolveApiKey = (req) => {
   return header?.startsWith("Bearer ") ? header.slice(7).trim() || null : null;
 };
 
+/** Parses MCP_PUBLIC_HOST, which may name several hosts. */
+export function hostsFromEnv(value = process.env.MCP_PUBLIC_HOST): string[] {
+  const hosts = (value ?? "")
+    .split(",")
+    .map((host) => host.trim())
+    .filter(Boolean);
+  return hosts.length ? hosts : ["localhost"];
+}
+
 const keyId = (apiKey: string) =>
   createHash("sha256").update(apiKey).digest("hex");
 
@@ -116,16 +125,17 @@ export interface HandlerOptions {
   resolveApiKey?: ResolveApiKey;
   /**
    * Hostnames this server answers to, for the DNS-rebinding check the MCP spec
-   * asks for on HTTP transports. Defaults to MCP_PUBLIC_HOST.
+   * asks for on HTTP transports. Defaults to MCP_PUBLIC_HOST, which accepts a
+   * comma-separated list — a deployment is commonly reachable by more than one
+   * name at once, and comparing them is the way to tell a proxy problem from an
+   * origin one.
    */
   allowedHosts?: string[];
 }
 
 export function createHandler(opts: HandlerOptions = {}) {
   const resolveApiKey = opts.resolveApiKey ?? bearerApiKey;
-  const allowedHosts =
-    opts.allowedHosts ??
-    (process.env.MCP_PUBLIC_HOST ? [process.env.MCP_PUBLIC_HOST] : ["localhost"]);
+  const allowedHosts = opts.allowedHosts ?? hostsFromEnv();
 
   return async function handle(req: IncomingMessage, res: ServerResponse) {
     try {

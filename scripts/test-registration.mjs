@@ -93,6 +93,32 @@ check(
   `got ${waitDefault(hostedHandles, "trim_video")}`
 );
 
+// --- a deployment can answer to more than one hostname -----------------------
+// Comparing a proxied hostname against the origin's own is how a proxy problem
+// is told apart from an origin one, and the rebinding check has to allow both
+// for that comparison to be possible.
+{
+  const { hostsFromEnv } = await import("../dist/http.js");
+  check(
+    "a single host still works",
+    JSON.stringify(hostsFromEnv("mcp.example.com")) === '["mcp.example.com"]',
+    JSON.stringify(hostsFromEnv("mcp.example.com"))
+  );
+  check(
+    "several hosts are accepted, whitespace and all",
+    JSON.stringify(hostsFromEnv(" mcp.example.com , app.herokuapp.com ")) ===
+      '["mcp.example.com","app.herokuapp.com"]',
+    JSON.stringify(hostsFromEnv(" mcp.example.com , app.herokuapp.com "))
+  );
+  check(
+    "an unset or empty value falls back to localhost",
+    JSON.stringify(hostsFromEnv(undefined)) === '["localhost"]' &&
+      JSON.stringify(hostsFromEnv("")) === '["localhost"]' &&
+      JSON.stringify(hostsFromEnv(" , ")) === '["localhost"]',
+    "empty handling is wrong"
+  );
+}
+
 // --- a bad key never gets a client ------------------------------------------
 // /account answers on any valid key regardless of scope, so a 401 from it means
 // the key itself is bad. Anything else is not proof, and refusing service
