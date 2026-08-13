@@ -10,8 +10,14 @@
  * confirms existence and contents by hash. The failure is silent and severe
  * enough that it should not depend on review.
  */
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
 import { createServer } from "../dist/server.js";
 import { RateWindow, isRateLimitedMethod } from "../dist/client.js";
+import { TOOL_SCOPES } from "../dist/scopes.js";
+
+const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 
 let failures = 0;
 const check = (label, pass, detail) => {
@@ -92,6 +98,43 @@ check(
   waitDefault(hostedHandles, "trim_video") === false,
   `got ${waitDefault(hostedHandles, "trim_video")}`
 );
+
+// --- every /tools endpoint has a tool, and vice versa ------------------------
+// The media family grows a few at a time, and a missing one is invisible: the
+// server just quietly doesn't offer it. Comparing against tools:write catches
+// both directions, since every dispatcher carries that scope and nothing else
+// does.
+{
+  const spec = JSON.parse(readFileSync(join(root, "spec/openapi.json"), "utf8"));
+  const endpoints = Object.keys(spec.paths)
+    .filter((p) => p.startsWith("/tools/"))
+    .map((p) => p.slice("/tools/".length))
+    .sort();
+  const dispatchers = Object.entries(TOOL_SCOPES)
+    .filter(([, scope]) => scope === "tools:write")
+    .map(([name]) => name)
+    .sort();
+
+  const unimplemented = endpoints.filter((s) => !dispatchers.includes(s));
+  check(
+    "every /tools endpoint in the spec has a tool",
+    unimplemented.length === 0,
+    `no tool for: ${unimplemented.join(", ")}`
+  );
+
+  const orphaned = dispatchers.filter((n) => !endpoints.includes(n));
+  check(
+    "every media tool still has an endpoint behind it",
+    orphaned.length === 0,
+    `no endpoint for: ${orphaned.join(", ")}`
+  );
+
+  check(
+    "and each one is actually registered",
+    endpoints.every((s) => local.includes(s)),
+    `not registered: ${endpoints.filter((s) => !local.includes(s)).join(", ")}`
+  );
+}
 
 // --- a long job reports progress instead of going silent ---------------------
 // The API returns 0-100 on every poll. Forwarding it is what a client needs to

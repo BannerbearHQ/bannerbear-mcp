@@ -338,7 +338,9 @@ without hitting the API. `scripts/test-scopes.mjs` covers scope filtering
 against stub tool handles, including every fail-open path.
 `scripts/test-registration.mjs` covers what each deployment shape registers —
 above all that hosted mode omits the two filesystem tools, since that failure
-is silent and hands out arbitrary file reads. All three run under `npm test`.
+is silent and hands out arbitrary file reads. It also checks the media tools
+against the spec in both directions, so an endpoint added upstream fails the
+build rather than going quietly unimplemented. All three run under `npm test`.
 
 `src/server.ts` builds a server bound to one key and knows nothing about
 transports; `src/index.ts` and `src/serve.ts` are the two entry points. Adding a
