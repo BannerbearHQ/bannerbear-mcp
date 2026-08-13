@@ -84,6 +84,27 @@ exchange touches nothing else.
 `MCP_PUBLIC_HOST` must match the `Host` header exactly, including a port if the
 port is non-default, or the DNS-rebinding check rejects the request with `403`.
 
+`GET /health` answers `200` unauthenticated with the running version, so a
+deployment can be told apart from an outage. Everything else without a
+credential is `401` — visiting the host in a browser gives
+`{"error":"Unauthorized"}`, which is correct rather than a symptom.
+
+**Error reporting** is off unless `SENTRY_DSN` is set, and even then only if
+`@sentry/node` resolves — it is imported dynamically and deliberately not a
+dependency. The SDK pulls ~56MB through OpenTelemetry, taking a runtime install
+from 23MB to 79MB, which every `npx` user would download on first run to support
+something only the hosted server uses, and would worsen the startup timeout
+above. Install it in the deployment if you want it:
+
+```sh
+npm install @sentry/node && heroku config:set SENTRY_DSN=...
+```
+
+Reports are scrubbed before they leave the process: request headers, cookies and
+bodies are dropped wholesale, and the serialised event is swept for key-shaped
+strings, because every request here carries a live API key in its
+`Authorization` header. `scripts/test-registration.mjs` asserts none survives.
+
 Hosted mode differs from stdio in three ways, all of them deliberate:
 
 - **`upload_asset` and `check_assets` are not registered.** Both resolve a

@@ -90,6 +90,42 @@ check(
   `got ${waitDefault(hostedHandles, "trim_video")}`
 );
 
+// --- error reports carry no credentials --------------------------------------
+// Every request to the hosted server carries a live key in its Authorization
+// header, so a report that leaked one would hand it to a third party.
+{
+  const { redact } = await import("../dist/observability.js");
+  const out = redact({
+    request: {
+      headers: { authorization: "Bearer bb_ak_v5_SECRET" },
+      cookies: "session=abc",
+      data: { body: "bb_ak_v5_SECRET" },
+    },
+    message: "POST /images failed for bb_ak_v5_SECRET",
+    extra: { nested: ["bb_ak_v5_SECRET"], deep: { k: "bb_ak_v5_SECRET" } },
+  });
+  const serialised = JSON.stringify(out);
+
+  check(
+    "request headers, cookies and body are dropped entirely",
+    !serialised.includes("authorization") &&
+      !serialised.includes("cookies") &&
+      !serialised.includes("session=abc"),
+    serialised
+  );
+  check(
+    "no key survives anywhere in the payload, at any depth",
+    !serialised.includes("bb_ak_v5_SECRET"),
+    serialised
+  );
+  check(
+    "the message itself is kept, minus the key",
+    out.message.includes("POST /images failed") &&
+      out.message.includes("[redacted]"),
+    out.message
+  );
+}
+
 // --- only POST is metered ----------------------------------------------------
 // Polling is all GETs and is the highest-frequency traffic the client makes;
 // counting it would throttle a render behind its own status checks.

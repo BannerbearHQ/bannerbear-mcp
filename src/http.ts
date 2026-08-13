@@ -2,7 +2,8 @@ import { createHash } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { RateWindow } from "./client.js";
-import { createServer, normalizeEmptyArguments } from "./server.js";
+import { noopReporter, type Reporter } from "./observability.js";
+import { VERSION, createServer, normalizeEmptyArguments } from "./server.js";
 
 /**
  * Resolves the Bannerbear key a request acts as, or null to reject it.
@@ -81,15 +82,47 @@ export interface HandlerOptions {
    * asks for on HTTP transports. Defaults to MCP_PUBLIC_HOST.
    */
   allowedHosts?: string[];
+  /** Where unexpected failures go. Defaults to dropping them. */
+  reporter?: Reporter;
 }
 
 export function createHandler(opts: HandlerOptions = {}) {
   const resolveApiKey = opts.resolveApiKey ?? bearerApiKey;
+  const reporter = opts.reporter ?? noopReporter;
   const allowedHosts =
     opts.allowedHosts ??
     (process.env.MCP_PUBLIC_HOST ? [process.env.MCP_PUBLIC_HOST] : ["localhost"]);
 
   return async function handle(req: IncomingMessage, res: ServerResponse) {
+    try {
+      await route(req, res);
+    } catch (err) {
+      // Node does not await this handler, so an escaping rejection would be an
+      // unhandled rejection rather than a failed request — on some configs
+      // that takes the process down and every in-flight session with it.
+      reporter.captureException(err, { url: req.url, method: req.method });
+      console.error(`Unhandled error serving ${req.method} ${req.url}:`, err);
+      if (!res.headersSent) {
+        res
+          .writeHead(500, { "content-type": "application/json" })
+          .end(JSON.stringify({ error: "Internal error" }));
+      } else {
+        res.end();
+      }
+    }
+  };
+
+  async function route(req: IncomingMessage, res: ServerResponse) {
+    // Unauthenticated liveness check. Deliberately bare: it exists so a
+    // deployment can be told apart from an outage, and says nothing a caller
+    // could not learn from the package.
+    if (req.method === "GET" && (req.url === "/health" || req.url === "/healthz")) {
+      res
+        .writeHead(200, { "content-type": "application/json" })
+        .end(JSON.stringify({ ok: true, name: "bannerbear-mcp", version: VERSION }));
+      return;
+    }
+
     let apiKey: string | null;
     try {
       apiKey = await resolveApiKey(req);
@@ -135,5 +168,5 @@ export function createHandler(opts: HandlerOptions = {}) {
     normalizeEmptyArguments(transport);
     if (shouldRefreshScopes(apiKey, Date.now())) void applyScopes();
     await transport.handleRequest(req, res);
-  };
+  }
 }
