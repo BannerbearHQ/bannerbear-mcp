@@ -9,7 +9,13 @@ import {
   LAYER_TYPE_REFERENCE,
   MODIFICATION_REFERENCE,
 } from "../generated/schemas.js";
-import { fail, guard, ok, pageParam, summariseLayers } from "./common.js";
+import {
+  fail,
+  guard,
+  ok,
+  pageParam,
+  summariseTemplate,
+} from "./common.js";
 
 const layerTypeEnum = z.enum(LAYER_TYPES as unknown as [string, ...string[]]);
 
@@ -166,8 +172,10 @@ export function registerTemplateTools(
     {
       title: "List templates",
       description:
-        "List image templates. Returns uid, name, dimensions and a " +
-        "layer summary — call get_template for the full canvas config.",
+        "List image templates. Returns uid, name, dimensions, creation time, " +
+        "a preview image URL and a layer summary — call get_template for the " +
+        "full canvas config. The endpoint documents no ordering, so sort by " +
+        "created_at rather than assuming the first row is the newest.",
       inputSchema: { ...pageParam },
     },
     async ({ page }) =>
@@ -175,13 +183,7 @@ export function registerTemplateTools(
         const rows = await client.request<any[]>("GET", "/image_templates", {
           query: { page },
         });
-        return (Array.isArray(rows) ? rows : []).map((t) => ({
-          uid: t.uid,
-          name: t.name,
-          width: t.width,
-          height: t.height,
-          layers: summariseLayers(t.config),
-        }));
+        return (Array.isArray(rows) ? rows : []).map(summariseTemplate);
       })
   );
 

@@ -99,6 +99,53 @@ check(
   `got ${waitDefault(hostedHandles, "trim_video")}`
 );
 
+// --- listing keeps enough to answer "which is newest?" -----------------------
+// Summarising a template is necessary — the full record is thousands of lines —
+// but dropping created_at made that question unanswerable without fetching
+// every template one by one, and the endpoint documents no ordering to fall
+// back on.
+{
+  const { summariseTemplate } = await import("../dist/tools/common.js");
+  const row = summariseTemplate({
+    uid: "abc",
+    name: "Promo",
+    width: 1200,
+    height: 700,
+    created_at: "2026-08-12T02:13:24.393Z",
+    preview: "https://images.example.com/preview.jpg",
+    description: null,
+    config: { objects: [{ name: "title", type: "text", text: "Hello" }] },
+  });
+
+  check(
+    "a listed template carries created_at and preview",
+    row.created_at === "2026-08-12T02:13:24.393Z" &&
+      row.preview === "https://images.example.com/preview.jpg",
+    JSON.stringify(row)
+  );
+  check(
+    "identity and dimensions survive too",
+    row.uid === "abc" && row.name === "Promo" && row.width === 1200 && row.height === 700,
+    JSON.stringify(row)
+  );
+  check(
+    "the layer summary stays condensed rather than full config",
+    Array.isArray(row.layers) &&
+      row.layers.length === 1 &&
+      typeof row.layers[0] === "string" &&
+      row.layers[0].includes("title"),
+    JSON.stringify(row.layers)
+  );
+  check(
+    "a template missing fields summarises without throwing",
+    (() => {
+      const bare = summariseTemplate({ uid: "x" });
+      return bare.uid === "x" && Array.isArray(bare.layers) && bare.layers.length === 0;
+    })(),
+    "an incomplete record broke the summariser"
+  );
+}
+
 // --- every /tools endpoint has a tool, and vice versa ------------------------
 // The media family grows a few at a time, and a missing one is invisible: the
 // server just quietly doesn't offer it. Comparing against tools:write catches
