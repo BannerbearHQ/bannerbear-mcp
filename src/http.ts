@@ -166,6 +166,27 @@ export function createHandler(opts: HandlerOptions = {}) {
       return;
     }
 
+    // Check the origin before doing any work on its behalf — including the
+    // /account call authentication needs. A rebound origin should not get to
+    // probe whether a key is valid, and a host mismatch should not be masked by
+    // whatever the credential happens to be. The transport checks this too;
+    // doing it here decides which answer comes back first.
+    const host = req.headers.host ?? "";
+    if (!allowedHosts.includes(host)) {
+      res
+        .writeHead(403, { "content-type": "application/json" })
+        .end(
+          JSON.stringify({
+            error: "Host not allowed",
+            // Naming it saves a long hunt: the caller already knows what it
+            // sent, and this is exactly the value MCP_PUBLIC_HOST needs.
+            host,
+            allowed: allowedHosts,
+          })
+        );
+      return;
+    }
+
     let apiKey: string | null;
     try {
       apiKey = await resolveApiKey(req);

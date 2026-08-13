@@ -91,6 +91,19 @@ through a CDN is how a proxy problem gets told apart from an origin one:
 MCP_PUBLIC_HOST=mcp.example.com,my-app.herokuapp.com
 ```
 
+A rejected host answers `403` naming both what arrived and what is allowed, so
+the fix is visible without going through the logs:
+
+```json
+{"error":"Host not allowed","host":"my-app.herokuapp.com","allowed":["mcp.example.com"]}
+```
+
+The host is checked before the credential, so a wrong host reads as `403` even
+when the key is also wrong, and a request from an unexpected origin never gets
+to probe whether a key is valid. `GET /health` skips both checks — it answers on
+any hostname, which makes it the way to tell "the app is down" from "the app is
+refusing this hostname".
+
 `GET /health` answers `200` unauthenticated with the running version, so a
 deployment can be told apart from an outage. Everything else without a
 credential is `401` — visiting the host in a browser gives
