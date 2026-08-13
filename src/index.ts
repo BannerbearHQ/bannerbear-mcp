@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { createServer, normalizeEmptyArguments } from "./server.js";
+import { createServer, normalizeEmptyArguments, resolveGroups } from "./server.js";
 
 const apiKey = process.env.BANNERBEAR_API_KEY;
 if (!apiKey) {
@@ -35,10 +35,23 @@ if (!apiKey.startsWith(V5_KEY_PREFIX)) {
 
 // One process, one user, one key: the filesystem tools are addressing the
 // caller's own disk, and the process lives as long as their session does.
+// Tool definitions cost tokens on every conversation whether used or not, so
+// a caller who never touches video can leave those seventeen unregistered.
+// Refuses to start on an unrecognised name rather than quietly serving a
+// different surface.
+let groups: string[];
+try {
+  groups = resolveGroups(process.env.MCP_TOOL_GROUPS);
+} catch (err) {
+  console.error((err as Error).message);
+  process.exit(1);
+}
+
 const { server, applyScopes } = createServer({
   apiKey,
   filesystemTools: true,
   pollMediaJobs: true,
+  groups,
 });
 
 const transport = new StdioServerTransport();

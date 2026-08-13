@@ -4,7 +4,12 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { BannerbearError, RateWindow, type BannerbearClient } from "./client.js";
 import { logError, logInfo } from "./observability.js";
 import { TOOL_SCOPES, filterToolsByScopes, scopesFromAccount } from "./scopes.js";
-import { VERSION, createServer, normalizeEmptyArguments } from "./server.js";
+import {
+  VERSION,
+  createServer,
+  normalizeEmptyArguments,
+  resolveGroups,
+} from "./server.js";
 
 /**
  * Resolves the Bannerbear key a request acts as, or null to reject it.
@@ -238,6 +243,20 @@ export function createHandler(opts: HandlerOptions = {}) {
       return;
     }
 
+    // The path selects a tool profile, so each caller chooses their own surface
+    // at connect time rather than the deployment choosing for everyone. `/` is
+    // everything, which is what every existing client already asks for.
+    const path = (req.url ?? "/").split("?")[0].replace(/\/+$/, "") || "/";
+    let groups: string[];
+    try {
+      groups = resolveGroups(path === "/" ? undefined : path.slice(1));
+    } catch (err) {
+      res
+        .writeHead(404, { "content-type": "application/json" })
+        .end(JSON.stringify({ error: (err as Error).message, path }));
+      return;
+    }
+
     let apiKey: string | null;
     try {
       apiKey = await resolveApiKey(req);
@@ -266,6 +285,7 @@ export function createHandler(opts: HandlerOptions = {}) {
       // via get_tool_job.
       pollMediaJobs: true,
       rateWindow: windowFor(apiKey),
+      groups,
     });
 
     // Prove the key before serving anything with it. Construction above is

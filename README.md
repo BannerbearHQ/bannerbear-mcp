@@ -67,6 +67,36 @@ rendering video from a template, as image templates do — are still to come.
 
 A scoped API key sees fewer tools — see below.
 
+### Registering fewer tools
+
+Every tool definition is spent on every conversation whether it gets used or
+not — all 46 come to ~12k tokens, and the media family alone is 45% of that. A
+deployment that never touches video can leave those seventeen unregistered.
+
+Over stdio, set `MCP_TOOL_GROUPS`:
+
+```sh
+MCP_TOOL_GROUPS=core npx -y @bannerbear/mcp
+```
+
+Hosted, the path picks the profile, so each caller chooses their own surface at
+connect time rather than the deployment choosing for everyone:
+
+```
+https://mcp.example.com/         all 46 tools   ~12.0k tokens
+https://mcp.example.com/core     29 tools       ~6.5k
+https://mcp.example.com/media    28 tools       ~7.3k
+```
+
+Both accept a profile (`all`, `core`, `media`) or a comma-separated list of
+groups: `workspace`, `templates`, `generation`, `assets`, `publications`,
+`media`. An unrecognised name is refused — stdio won't start, hosted answers
+`404` naming the valid options — because a typo that quietly halves the tool
+list looks like a broken server rather than a config mistake.
+
+Scoped credentials narrow the list too, and the two compose: a token without
+`tools:*` loses the media tools whether or not the profile included them.
+
 ### Running it as a hosted endpoint
 
 The same tools serve two shapes. `dist/index.js` is the stdio binary above.

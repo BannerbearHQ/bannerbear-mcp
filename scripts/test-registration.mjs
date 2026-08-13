@@ -242,6 +242,71 @@ check(
   );
 }
 
+// --- tool groups -------------------------------------------------------------
+// Every tool definition is spent on every conversation whether it gets used or
+// not, so a deployment that never touches video shouldn't carry seventeen video
+// tools. The failure to guard against is a typo silently serving a smaller
+// surface, which looks like a broken server rather than a config mistake.
+{
+  const { resolveGroups, TOOL_GROUPS } = await import("../dist/server.js");
+  const size = (groups) =>
+    Object.keys(
+      createServer({
+        apiKey: "bb_ak_v5_test",
+        filesystemTools: true,
+        pollMediaJobs: true,
+        groups,
+      }).handles
+    ).length;
+
+  const everything = size(resolveGroups(undefined));
+  check(
+    "no spec registers everything",
+    everything === size(resolveGroups("all")) && everything > 40,
+    `${everything} tools`
+  );
+
+  const core = size(resolveGroups("core"));
+  check(
+    "core drops the media family and keeps the rest",
+    core < everything && core > 20,
+    `core ${core}, all ${everything}`
+  );
+
+  check(
+    "an explicit list registers only those groups",
+    size(resolveGroups("templates,generation")) < core,
+    `${size(resolveGroups("templates,generation"))} tools`
+  );
+
+  check(
+    "order and spacing in the list don't matter",
+    JSON.stringify(resolveGroups("generation, templates")) ===
+      JSON.stringify(resolveGroups("templates,generation")),
+    "the same groups in a different order gave a different result"
+  );
+
+  let refused = false;
+  try {
+    resolveGroups("templates,typo");
+  } catch (err) {
+    refused = err.message.includes("typo") && err.message.includes("templates");
+  }
+  check(
+    "an unknown group is refused, and the error names the valid ones",
+    refused,
+    "a typo was silently ignored instead of refused"
+  );
+
+  check(
+    "every group in the profile map is a real group",
+    ["all", "core", "media"].every((p) =>
+      resolveGroups(p).every((g) => TOOL_GROUPS.includes(g))
+    ),
+    "a profile references a group that does not exist"
+  );
+}
+
 // --- a credential whose scopes match nothing ---------------------------------
 // This is what "no actions available" looks like from a client: not an error,
 // just an almost-empty tool list. Worth pinning down, since the two causes —

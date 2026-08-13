@@ -12,6 +12,64 @@ import { registerToolkitTools } from "./tools/toolkit.js";
 
 export const VERSION = "0.8.0";
 
+/**
+ * Tool groups, so a deployment can register only what it needs.
+ *
+ * Tool definitions are ~12k tokens across 46 tools, and every one is spent on
+ * every conversation whether or not it gets used. The media family alone is 45%
+ * of that. A caller who never touches video shouldn't pay for seventeen video
+ * tools, and this is the cheap way to say so — no dispatcher, no schemas
+ * fetched on demand, just not registering what wasn't asked for.
+ */
+const GROUPS: Record<
+  string,
+  (server: McpServer, client: BannerbearClient, opts: ServerOptions) => void
+> = {
+  workspace: (s, c) => registerWorkspaceTools(s, c),
+  templates: (s, c) => registerTemplateTools(s, c),
+  generation: (s, c) => registerGenerationTools(s, c),
+  assets: (s, c, o) => registerAssetTools(s, c, { filesystem: o.filesystemTools }),
+  publications: (s, c) => registerPublicationTools(s, c),
+  media: (s, c, o) => registerToolkitTools(s, c, { pollByDefault: o.pollMediaJobs }),
+};
+
+export const TOOL_GROUPS = Object.keys(GROUPS);
+
+/** Named shorthands for the two splits that actually come up. */
+const PROFILES: Record<string, string[]> = {
+  all: TOOL_GROUPS,
+  core: TOOL_GROUPS.filter((g) => g !== "media"),
+  media: ["workspace", "media"],
+};
+
+/**
+ * Turns a group spec into the groups to register.
+ *
+ * Accepts a profile name (`all`, `core`, `media`) or a comma-separated list of
+ * group names. Throws on anything unrecognised rather than silently serving a
+ * different surface — a typo that quietly removes half the tools is far worse
+ * to debug than one that refuses to start.
+ */
+export function resolveGroups(spec?: string | string[]): string[] {
+  const names = (Array.isArray(spec) ? spec : (spec ?? "").split(","))
+    .map((n) => n.trim().toLowerCase())
+    .filter(Boolean);
+
+  if (names.length === 0) return TOOL_GROUPS;
+  if (names.length === 1 && names[0] in PROFILES) return PROFILES[names[0]];
+
+  const unknown = names.filter((n) => !TOOL_GROUPS.includes(n));
+  if (unknown.length) {
+    throw new Error(
+      `Unknown tool group(s): ${unknown.join(", ")}. ` +
+        `Expected a profile (${Object.keys(PROFILES).join(", ")}) ` +
+        `or any of: ${TOOL_GROUPS.join(", ")}.`
+    );
+  }
+  // Registration order follows GROUPS, not the order they were asked for.
+  return TOOL_GROUPS.filter((g) => names.includes(g));
+}
+
 export interface ServerOptions {
   /** The key this instance acts as. One key per instance, never process-wide. */
   apiKey: string;
@@ -44,6 +102,11 @@ export interface ServerOptions {
    * never engages. Omit when the process serves one key for its lifetime.
    */
   rateWindow?: RateWindow;
+  /**
+   * Which tool groups to register. Defaults to all of them; see resolveGroups
+   * for the accepted spellings.
+   */
+  groups?: string[];
 }
 
 export interface BannerbearServer {
@@ -86,12 +149,9 @@ export function createServer(opts: ServerOptions): BannerbearServer {
     return tool;
   };
 
-  registerWorkspaceTools(server, client);
-  registerTemplateTools(server, client);
-  registerGenerationTools(server, client);
-  registerAssetTools(server, client, { filesystem: opts.filesystemTools });
-  registerPublicationTools(server, client);
-  registerToolkitTools(server, client, { pollByDefault: opts.pollMediaJobs });
+  for (const group of opts.groups ?? TOOL_GROUPS) {
+    GROUPS[group]?.(server, client, opts);
+  }
 
   (server as any).registerTool = registerTool;
 
