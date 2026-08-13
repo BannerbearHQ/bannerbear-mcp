@@ -89,6 +89,19 @@ deployment can be told apart from an outage. Everything else without a
 credential is `401` — visiting the host in a browser gives
 `{"error":"Unauthorized"}`, which is correct rather than a symptom.
 
+**Keys are proven before anything is served.** `/account` answers on any valid
+key regardless of scope, so it doubles as the authentication check: a `401` from
+it means the key is bad, and the request is refused before a client is
+connected. Without this a mistyped key produced a working-looking install —
+`initialize` succeeded, all tools listed, and every call then failed — with the
+error pointing at the tool rather than the config.
+
+Only a `401` rejects. A network failure or a `5xx` leaves the key unproven, and
+the request goes through unfiltered rather than refusing service because the API
+had a bad minute. The result is cached for five minutes per key, so this costs
+one round trip per key rather than one per request, and the scope narrowing
+reuses the same response instead of fetching again.
+
 **Errors go to stderr**, which the platform captures and a log drain can
 forward on. There is no reporting SDK — the one worth using pulls ~56MB through
 OpenTelemetry, taking a runtime install from 23MB to 79MB, which every `npx`

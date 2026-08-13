@@ -1,8 +1,9 @@
 import { createHash } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import { RateWindow } from "./client.js";
+import { BannerbearError, RateWindow, type BannerbearClient } from "./client.js";
 import { logError } from "./observability.js";
+import { filterToolsByScopes, scopesFromAccount } from "./scopes.js";
 import { VERSION, createServer, normalizeEmptyArguments } from "./server.js";
 
 /**
@@ -24,27 +25,63 @@ export const bearerApiKey: ResolveApiKey = (req) => {
   return header?.startsWith("Bearer ") ? header.slice(7).trim() || null : null;
 };
 
+const keyId = (apiKey: string) =>
+  createHash("sha256").update(apiKey).digest("hex");
+
 /**
- * Scope lookups cached by key, so rebuilding per request doesn't spend a
- * /account round trip every time. Keyed by digest so the key itself is never
+ * What /account said about a key, cached so rebuilding per request doesn't
+ * spend a round trip every time. Keyed by digest so the key itself is never
  * held in a map.
  *
  * Process-local and lost on restart, which is fine: a cold cache costs one
- * extra call and the filter fails open regardless.
+ * extra call. A revoked key keeps connecting until its entry ages out, but
+ * every call it makes still fails at the API, so the window buys nothing.
  */
-const SCOPE_TTL_MS = 5 * 60_000;
-const scopeChecked = new Map<string, number>();
+const AUTH_TTL_MS = 5 * 60_000;
+const checkedKeys = new Map<string, { at: number; scopes: string[] | null }>();
 
-function shouldRefreshScopes(apiKey: string, now: number): boolean {
-  const id = keyId(apiKey);
-  const last = scopeChecked.get(id);
-  if (last !== undefined && now - last < SCOPE_TTL_MS) return false;
-  scopeChecked.set(id, now);
-  return true;
+export interface AuthResult {
+  /** False only when the API positively rejected the key. */
+  ok: boolean;
+  /** Scopes to narrow the tool list to, or null to leave it whole. */
+  scopes: string[] | null;
 }
 
-const keyId = (apiKey: string) =>
-  createHash("sha256").update(apiKey).digest("hex");
+/**
+ * Confirms a key is real before anything is served with it.
+ *
+ * /account is reachable on any valid key regardless of scope, so a 401 from it
+ * means the key itself is bad — reject, rather than connecting a client that
+ * lists 46 tools and then fails every one of them.
+ *
+ * Any other failure is not proof of anything: a network blip or a 5xx leaves
+ * the key unproven, so the request is allowed through unfiltered. Refusing
+ * service because Bannerbear had a bad minute would be the worse error.
+ */
+export async function authenticateKey(
+  client: Pick<BannerbearClient, "request">,
+  apiKey: string,
+  now = Date.now()
+): Promise<AuthResult> {
+  const id = keyId(apiKey);
+  const cached = checkedKeys.get(id);
+  if (cached && now - cached.at < AUTH_TTL_MS) {
+    return { ok: true, scopes: cached.scopes };
+  }
+
+  try {
+    const account = await client.request("GET", "/account");
+    const scopes = scopesFromAccount(account);
+    checkedKeys.set(id, { at: now, scopes });
+    return { ok: true, scopes };
+  } catch (err) {
+    if (err instanceof BannerbearError && err.status === 401) {
+      checkedKeys.delete(id);
+      return { ok: false, scopes: null };
+    }
+    return { ok: true, scopes: null };
+  }
+}
 
 /**
  * One rate-limit window per key, shared by every request acting as that key.
@@ -135,7 +172,7 @@ export function createHandler(opts: HandlerOptions = {}) {
       return;
     }
 
-    const { server, applyScopes } = createServer({
+    const { server, client, handles } = createServer({
       apiKey,
       // The caller is not on this machine, so a path argument would address
       // the server's disk rather than theirs.
@@ -148,6 +185,23 @@ export function createHandler(opts: HandlerOptions = {}) {
       pollMediaJobs: true,
       rateWindow: windowFor(apiKey),
     });
+
+    // Prove the key before serving anything with it. Construction above is
+    // pure, so nothing has been connected yet and this costs only the object.
+    const auth = await authenticateKey(client, apiKey);
+    if (!auth.ok) {
+      await server.close();
+      res
+        .writeHead(401, {
+          "WWW-Authenticate": "Bearer",
+          "content-type": "application/json",
+        })
+        .end(JSON.stringify({ error: "Invalid API key" }));
+      return;
+    }
+    // Narrow before connecting, so the first tools/list is already correct
+    // rather than being corrected afterwards by listChanged.
+    if (auth.scopes) filterToolsByScopes(auth.scopes, handles);
 
     const transport = new StreamableHTTPServerTransport({
       // Stateless. Routing by `mcp-session-id` needs affinity the platform
@@ -165,7 +219,6 @@ export function createHandler(opts: HandlerOptions = {}) {
 
     await server.connect(transport);
     normalizeEmptyArguments(transport);
-    if (shouldRefreshScopes(apiKey, Date.now())) void applyScopes();
     await transport.handleRequest(req, res);
   }
 }

@@ -93,6 +93,74 @@ check(
   `got ${waitDefault(hostedHandles, "trim_video")}`
 );
 
+// --- a bad key never gets a client ------------------------------------------
+// /account answers on any valid key regardless of scope, so a 401 from it means
+// the key itself is bad. Anything else is not proof, and refusing service
+// because the API had a bad minute would be the worse failure.
+{
+  const { authenticateKey } = await import("../dist/http.js");
+  const { BannerbearError } = await import("../dist/client.js");
+
+  const stub = (behaviour) => {
+    let calls = 0;
+    return {
+      calls: () => calls,
+      request: async () => {
+        calls++;
+        if (behaviour instanceof Error) throw behaviour;
+        return behaviour;
+      },
+    };
+  };
+
+  const rejected = stub(new BannerbearError("Invalid API Key", 401));
+  const bad = await authenticateKey(rejected, "bb_ak_v5_bad");
+  check(
+    "a 401 from /account rejects the key",
+    bad.ok === false,
+    JSON.stringify(bad)
+  );
+
+  const flaky = stub(new BannerbearError("upstream exploded", 503));
+  const unproven = await authenticateKey(flaky, "bb_ak_v5_unproven");
+  check(
+    "a 5xx leaves the key unproven and allowed, unfiltered",
+    unproven.ok === true && unproven.scopes === null,
+    JSON.stringify(unproven)
+  );
+
+  const offline = stub(new BannerbearError("Network error", 0));
+  const stillIn = await authenticateKey(offline, "bb_ak_v5_offline");
+  check(
+    "a network failure does not lock a valid key out",
+    stillIn.ok === true,
+    JSON.stringify(stillIn)
+  );
+
+  const good = stub({ api_key: { scopes: ["images:read"] } });
+  const first = await authenticateKey(good, "bb_ak_v5_good");
+  check(
+    "a valid key is accepted and its scopes returned",
+    first.ok === true && JSON.stringify(first.scopes) === '["images:read"]',
+    JSON.stringify(first)
+  );
+
+  await authenticateKey(good, "bb_ak_v5_good");
+  check(
+    "the result is cached rather than re-fetched per request",
+    good.calls() === 1,
+    `/account was called ${good.calls()} times`
+  );
+
+  const full = stub({ api_key: { scopes: [] } });
+  const unrestricted = await authenticateKey(full, "bb_ak_v5_full");
+  check(
+    "an empty scope list means full access, not zero access",
+    unrestricted.ok === true && unrestricted.scopes === null,
+    JSON.stringify(unrestricted)
+  );
+}
+
 // --- logs carry no credentials -----------------------------------------------
 // Every request to the hosted server carries a live key in its Authorization
 // header, and logs leave the process — to the platform's store and onward to

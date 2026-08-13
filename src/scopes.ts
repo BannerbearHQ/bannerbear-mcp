@@ -96,7 +96,7 @@ export async function applyScopeFilter(
   client: BannerbearClient,
   tools: Record<string, RegisteredTool>
 ): Promise<void> {
-  let account: any;
+  let account: unknown;
   try {
     account = await client.request("GET", "/account");
   } catch (err) {
@@ -107,21 +107,10 @@ export async function applyScopeFilter(
     return;
   }
 
-  const scopes = account?.api_key?.scopes;
-  // An empty array means full access, per the spec. A missing or malformed
-  // field means we can't tell, which is treated the same way.
-  if (!Array.isArray(scopes) || scopes.length === 0) return;
+  const scopes = scopesFromAccount(account);
+  if (scopes === null) return;
 
-  const held = new Set<string>(scopes);
-  const disabled: string[] = [];
-  for (const [name, required] of Object.entries(TOOL_SCOPES)) {
-    if (held.has(required)) continue;
-    const tool = tools[name];
-    if (!tool || !tool.enabled) continue;
-    tool.disable();
-    disabled.push(name);
-  }
-
+  const disabled = filterToolsByScopes(scopes, tools);
   if (disabled.length === 0) {
     console.error(`API key scopes cover every tool (${scopes.length} scopes).`);
     return;
@@ -130,4 +119,40 @@ export async function applyScopeFilter(
     `API key is scoped to ${scopes.join(", ")}. ` +
       `Disabled ${disabled.length} unauthorized tool(s): ${disabled.join(", ")}.`
   );
+}
+
+/**
+ * Reads the scope list off an /account response.
+ *
+ * Returns null when there is nothing to act on — a malformed response, or the
+ * empty array the API uses to mean full access. Callers treat null as "change
+ * nothing", so both cases leave the full surface enabled.
+ */
+export function scopesFromAccount(account: unknown): string[] | null {
+  const scopes = (account as { api_key?: { scopes?: unknown } })?.api_key?.scopes;
+  if (!Array.isArray(scopes) || scopes.length === 0) return null;
+  return scopes as string[];
+}
+
+/**
+ * Disables the tools a scope list doesn't cover. Returns what was disabled.
+ *
+ * Split from the fetch so a caller that already has an /account response —
+ * the hosted path, which reads it to authenticate — can filter without paying
+ * for a second call.
+ */
+export function filterToolsByScopes(
+  scopes: string[],
+  tools: Record<string, RegisteredTool>
+): string[] {
+  const held = new Set(scopes);
+  const disabled: string[] = [];
+  for (const [name, required] of Object.entries(TOOL_SCOPES)) {
+    if (held.has(required)) continue;
+    const tool = tools[name];
+    if (!tool || !tool.enabled) continue;
+    tool.disable();
+    disabled.push(name);
+  }
+  return disabled;
 }
