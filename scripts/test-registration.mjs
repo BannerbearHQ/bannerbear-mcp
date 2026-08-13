@@ -242,6 +242,47 @@ check(
   );
 }
 
+// --- a credential whose scopes match nothing ---------------------------------
+// This is what "no actions available" looks like from a client: not an error,
+// just an almost-empty tool list. Worth pinning down, since the two causes —
+// a scope mismatch and a broken server — look identical from outside.
+{
+  const { filterToolsByScopes } = await import("../dist/scopes.js");
+  const build = () =>
+    createServer({
+      apiKey: "bb_ak_v5_test",
+      filesystemTools: false,
+      pollMediaJobs: true,
+    }).handles;
+
+  const enabled = (h) => Object.values(h).filter((t) => t.enabled).length;
+
+  const unrelated = build();
+  filterToolsByScopes(["videos:read", "videos:write"], unrelated);
+  check(
+    "scopes no tool requires leave only the ungated tools",
+    enabled(unrelated) === 2,
+    `${enabled(unrelated)} tools left`
+  );
+
+  const empty = build();
+  const before = enabled(empty);
+  const disabled = filterToolsByScopes([], empty);
+  check(
+    "an empty scope list means full access, not zero access",
+    disabled.length === 0 && enabled(empty) === before,
+    `disabled ${disabled.length}, ${enabled(empty)} of ${before} left`
+  );
+
+  const partial = build();
+  filterToolsByScopes(["images:read"], partial);
+  check(
+    "a narrow but valid scope leaves exactly its tools",
+    enabled(partial) === 4,
+    `${enabled(partial)} tools left`
+  );
+}
+
 // --- OAuth discovery ---------------------------------------------------------
 // A client arriving with no credential has to be able to find its way to one.
 // The 401 names the metadata document, the document names the authorization

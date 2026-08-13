@@ -145,6 +145,12 @@ export function filterToolsByScopes(
   scopes: string[],
   tools: Record<string, RegisteredTool>
 ): string[] {
+  // An empty list means full access, per the API. Callers reach here through
+  // scopesFromAccount, which already turns that into null — but read on its own
+  // this function would disable everything for the case that means the
+  // opposite, so refuse rather than rely on being called correctly.
+  if (scopes.length === 0) return [];
+
   const held = new Set(scopes);
   const disabled: string[] = [];
   for (const [name, required] of Object.entries(TOOL_SCOPES)) {

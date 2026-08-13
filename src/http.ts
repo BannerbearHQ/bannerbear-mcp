@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { BannerbearError, RateWindow, type BannerbearClient } from "./client.js";
-import { logError } from "./observability.js";
+import { logError, logInfo } from "./observability.js";
 import { TOOL_SCOPES, filterToolsByScopes, scopesFromAccount } from "./scopes.js";
 import { VERSION, createServer, normalizeEmptyArguments } from "./server.js";
 
@@ -283,7 +283,21 @@ export function createHandler(opts: HandlerOptions = {}) {
     }
     // Narrow before connecting, so the first tools/list is already correct
     // rather than being corrected afterwards by listChanged.
-    if (auth.scopes) filterToolsByScopes(auth.scopes, handles);
+    if (auth.scopes) {
+      const disabled = filterToolsByScopes(auth.scopes, handles);
+      const remaining = Object.values(handles).filter((t) => t.enabled).length;
+      // Logged because a short tool list is indistinguishable, from the
+      // client's side, from a broken server — "no actions available" is what a
+      // credential with the wrong scopes looks like, and without this there is
+      // nothing to point at.
+      if (disabled.length) {
+        logInfo("tools narrowed to credential scopes", {
+          granted: auth.scopes,
+          disabled: disabled.length,
+          remaining,
+        });
+      }
+    }
 
     const transport = new StreamableHTTPServerTransport({
       // Stateless. Routing by `mcp-session-id` needs affinity the platform

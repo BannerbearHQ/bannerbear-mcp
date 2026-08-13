@@ -30,6 +30,11 @@ export function redact<T>(value: T): T {
   }
 }
 
+/** Writes one redacted JSON line about something notable but not wrong. */
+export function logInfo(what: string, context: Record<string, unknown> = {}): void {
+  console.error(JSON.stringify(redact({ level: "info", what, ...context })));
+}
+
 /**
  * Writes one redacted JSON line per failure.
  *
