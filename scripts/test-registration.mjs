@@ -93,6 +93,65 @@ check(
   `got ${waitDefault(hostedHandles, "trim_video")}`
 );
 
+// --- a long job reports progress instead of going silent ---------------------
+// The API returns 0-100 on every poll. Forwarding it is what a client needs to
+// show something during a job that runs for minutes, and progress notifications
+// also reset the request timeout in clients that implement that.
+{
+  const { progressReporter } = await import("../dist/tools/toolkit.js");
+  const { BannerbearClient } = await import("../dist/client.js");
+
+  const sent = [];
+  const report = progressReporter({
+    _meta: { progressToken: "tok-1" },
+    sendNotification: async (n) => {
+      sent.push(n);
+    },
+  });
+  report(42);
+  await new Promise((r) => setTimeout(r, 20));
+  check(
+    "a progress token produces a spec-shaped notification",
+    sent.length === 1 &&
+      sent[0].method === "notifications/progress" &&
+      sent[0].params.progressToken === "tok-1" &&
+      sent[0].params.progress === 42 &&
+      sent[0].params.total === 100,
+    JSON.stringify(sent)
+  );
+
+  check(
+    "no token, no sender, or no extra means no reporter at all",
+    progressReporter({ sendNotification: async () => {} }) === undefined &&
+      progressReporter({ _meta: { progressToken: "x" } }) === undefined &&
+      progressReporter(undefined) === undefined,
+    "a reporter was built without something to report to"
+  );
+
+  // The poll loop has to actually call it, once per intermediate state and not
+  // for the terminal one.
+  const client = new BannerbearClient({ apiKey: "bb_ak_v5_test" });
+  const states = [
+    { status: "pending", progress: 0 },
+    { status: "running", progress: 50 },
+    { status: "completed", progress: 100 },
+  ];
+  let i = 0;
+  client.request = async () => states[i++];
+  const seen = [];
+  const done = await client.pollUntilDone(
+    "/tool_jobs/x",
+    10_000,
+    (s) => s.status === "completed" || s.status === "failed",
+    (s) => seen.push(s.progress)
+  );
+  check(
+    "the poll loop reports each intermediate state, not the last",
+    JSON.stringify(seen) === "[0,50]" && done.status === "completed",
+    `saw ${JSON.stringify(seen)}, finished ${done.status}`
+  );
+}
+
 // --- a deployment can answer to more than one hostname -----------------------
 // Comparing a proxied hostname against the origin's own is how a proxy problem
 // is told apart from an origin one, and the rebinding check has to allow both

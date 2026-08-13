@@ -206,13 +206,20 @@ export class BannerbearClient {
     path: string,
     timeoutMs = this.pollTimeoutMs,
     isDone: (result: T) => boolean = (result) =>
-      !!result.status && result.status !== "pending"
+      !!result.status && result.status !== "pending",
+    /**
+     * Called with every intermediate state. Exists so a caller can report
+     * progress while waiting — the poll already has the answer, and without
+     * this the wait is silent for as long as the job takes.
+     */
+    onPoll?: (result: T) => void
   ): Promise<T> {
     const deadline = Date.now() + timeoutMs;
     let delay = 1000;
     for (;;) {
       const result = await this.request<T>("GET", path);
       if (isDone(result)) return result;
+      onPoll?.(result);
       if (Date.now() >= deadline) {
         throw new BannerbearError(
           `Timed out after ${Math.round(timeoutMs / 1000)}s waiting for ${path}. ` +

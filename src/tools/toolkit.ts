@@ -53,12 +53,44 @@ const asyncParams = (pollByDefault: boolean) => ({
  * succeeded, so `guard` would call it a success and the model would have to
  * notice `status: "failed"` buried in the payload to know otherwise.
  */
+/**
+ * Turns a tool call's `extra` into a progress reporter, or undefined when the
+ * client didn't ask for one.
+ *
+ * Two reasons to bother. A job can run for minutes, and without this the call
+ * is silent for its whole duration — the API reports 0-100 on every poll and
+ * it was being thrown away. Progress notifications also reset the request
+ * timeout in clients that implement that, so a long job is less likely to be
+ * abandoned by the caller while it is still working.
+ */
+export function progressReporter(
+  extra: unknown
+): ((progress: number) => void) | undefined {
+  const meta = extra as {
+    _meta?: { progressToken?: string | number };
+    sendNotification?: (n: unknown) => Promise<void>;
+  };
+  const progressToken = meta?._meta?.progressToken;
+  if (progressToken === undefined || typeof meta.sendNotification !== "function") {
+    return undefined;
+  }
+  return (progress: number) => {
+    // Fire and forget: a client that has stopped listening must not strand
+    // the job that is still running for it.
+    void meta.sendNotification!({
+      method: "notifications/progress",
+      params: { progressToken, progress, total: 100 },
+    }).catch(() => {});
+  };
+}
+
 async function runTool(
   client: BannerbearClient,
   slug: string,
   body: Record<string, unknown>,
   wait: boolean,
-  timeoutSeconds: number
+  timeoutSeconds: number,
+  onProgress?: (progress: number) => void
 ): Promise<ToolResult> {
   try {
     const job = await client.request<any>("POST", `/tools/${slug}`, { body });
@@ -67,7 +99,10 @@ async function runTool(
     const finished = await client.pollUntilDone<any>(
       `/tool_jobs/${job.uid}`,
       timeoutSeconds * 1000,
-      isTerminal
+      isTerminal,
+      onProgress &&
+        ((state) =>
+          onProgress(typeof state.progress === "number" ? state.progress : 0))
     );
     if (finished.status === "failed") {
       return fail(
@@ -119,8 +154,15 @@ export function registerToolkitTools(
         description,
         inputSchema: { ...inputSchema, ...metadataParam, ...shared },
       },
-      async ({ wait, timeout_seconds, ...body }: any) =>
-        runTool(client, name, body, wait, timeout_seconds)
+      async ({ wait, timeout_seconds, ...body }: any, extra: unknown) =>
+        runTool(
+          client,
+          name,
+          body,
+          wait,
+          timeout_seconds,
+          progressReporter(extra)
+        )
     );
 
   asyncTool(

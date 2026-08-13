@@ -191,6 +191,13 @@ tools poll `/tool_jobs/{uid}` and return the finished output by default; pass
 job — handy for tying a result back to whatever triggered it. `list_tool_jobs`
 walks recent runs when a uid wasn't kept.
 
+While a job runs, each poll's `progress` (0-100) is forwarded as an MCP
+progress notification, so a client that asked for one can show movement instead
+of a call that appears stalled for minutes. It also matters for survival:
+clients that implement it reset their request timeout on progress, so a long job
+is less likely to be abandoned by the caller while it is still working. A client
+that sends no `progressToken` gets nothing extra.
+
 These jobs run `pending → running → completed`, so the client's poll takes a
 predicate — stopping at "anything but pending" would return a job before it has
 an output. A job that ends `failed` is reported as a tool error carrying
