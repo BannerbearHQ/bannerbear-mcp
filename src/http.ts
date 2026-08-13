@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { RateWindow } from "./client.js";
-import { noopReporter, type Reporter } from "./observability.js";
+import { logError } from "./observability.js";
 import { VERSION, createServer, normalizeEmptyArguments } from "./server.js";
 
 /**
@@ -82,13 +82,10 @@ export interface HandlerOptions {
    * asks for on HTTP transports. Defaults to MCP_PUBLIC_HOST.
    */
   allowedHosts?: string[];
-  /** Where unexpected failures go. Defaults to dropping them. */
-  reporter?: Reporter;
 }
 
 export function createHandler(opts: HandlerOptions = {}) {
   const resolveApiKey = opts.resolveApiKey ?? bearerApiKey;
-  const reporter = opts.reporter ?? noopReporter;
   const allowedHosts =
     opts.allowedHosts ??
     (process.env.MCP_PUBLIC_HOST ? [process.env.MCP_PUBLIC_HOST] : ["localhost"]);
@@ -100,8 +97,7 @@ export function createHandler(opts: HandlerOptions = {}) {
       // Node does not await this handler, so an escaping rejection would be an
       // unhandled rejection rather than a failed request — on some configs
       // that takes the process down and every in-flight session with it.
-      reporter.captureException(err, { url: req.url, method: req.method });
-      console.error(`Unhandled error serving ${req.method} ${req.url}:`, err);
+      logError("request failed", err, { url: req.url, method: req.method });
       if (!res.headersSent) {
         res
           .writeHead(500, { "content-type": "application/json" })

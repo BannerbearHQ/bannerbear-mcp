@@ -90,39 +90,63 @@ check(
   `got ${waitDefault(hostedHandles, "trim_video")}`
 );
 
-// --- error reports carry no credentials --------------------------------------
+// --- logs carry no credentials -----------------------------------------------
 // Every request to the hosted server carries a live key in its Authorization
-// header, so a report that leaked one would hand it to a third party.
+// header, and logs leave the process — to the platform's store and onward to
+// any drain. A key in a log line is a key handed to a third party.
 {
-  const { redact } = await import("../dist/observability.js");
-  const out = redact({
-    request: {
-      headers: { authorization: "Bearer bb_ak_v5_SECRET" },
-      cookies: "session=abc",
-      data: { body: "bb_ak_v5_SECRET" },
-    },
-    message: "POST /images failed for bb_ak_v5_SECRET",
-    extra: { nested: ["bb_ak_v5_SECRET"], deep: { k: "bb_ak_v5_SECRET" } },
-  });
-  const serialised = JSON.stringify(out);
+  const { redact, logError } = await import("../dist/observability.js");
+
+  const swept = JSON.stringify(
+    redact({
+      message: "POST /images failed for bb_ak_v5_SECRET",
+      nested: ["bb_ak_v5_SECRET"],
+      deep: { k: "bb_ak_v5_SECRET" },
+    })
+  );
+  check(
+    "no key survives redaction, at any depth",
+    !swept.includes("bb_ak_v5_SECRET") && swept.includes("[redacted]"),
+    swept
+  );
+  check(
+    "the surrounding message is kept",
+    swept.includes("POST /images failed"),
+    swept
+  );
+
+  // logError writes to stderr; capture it to check what actually goes out.
+  const original = console.error;
+  const written = [];
+  console.error = (line) => written.push(String(line));
+  try {
+    logError("request failed", new Error("boom for bb_ak_v5_SECRET"), {
+      url: "/?key=bb_ak_v5_SECRET",
+    });
+  } finally {
+    console.error = original;
+  }
 
   check(
-    "request headers, cookies and body are dropped entirely",
-    !serialised.includes("authorization") &&
-      !serialised.includes("cookies") &&
-      !serialised.includes("session=abc"),
-    serialised
+    "logError emits exactly one line",
+    written.length === 1 && !written[0].includes("\n"),
+    `wrote ${written.length} line(s)`
   );
   check(
-    "no key survives anywhere in the payload, at any depth",
-    !serialised.includes("bb_ak_v5_SECRET"),
-    serialised
-  );
-  check(
-    "the message itself is kept, minus the key",
-    out.message.includes("POST /images failed") &&
-      out.message.includes("[redacted]"),
-    out.message
+    "that line is valid JSON and carries no key",
+    (() => {
+      try {
+        const parsed = JSON.parse(written[0]);
+        return (
+          parsed.what === "request failed" &&
+          !written[0].includes("bb_ak_v5_SECRET") &&
+          written[0].includes("[redacted]")
+        );
+      } catch {
+        return false;
+      }
+    })(),
+    written[0]
   );
 }
 

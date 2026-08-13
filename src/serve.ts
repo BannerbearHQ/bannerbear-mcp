@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { createServer as createHttpServer } from "node:http";
 import { createHandler } from "./http.js";
-import { createReporter } from "./observability.js";
+import { logError } from "./observability.js";
 import { VERSION } from "./server.js";
 
 /**
@@ -14,22 +14,18 @@ import { VERSION } from "./server.js";
  * sending nothing until the work is done.
  */
 
-const reporter = await createReporter({ release: `bannerbear-mcp@${VERSION}` });
-
 // A request that dies mid-flight shouldn't take the process — and every other
 // in-flight session — with it.
 process.on("uncaughtException", (err) => {
-  reporter.captureException(err, { origin: "uncaughtException" });
-  console.error("Uncaught exception:", err);
+  logError("uncaught exception", err);
 });
 process.on("unhandledRejection", (reason) => {
-  reporter.captureException(reason, { origin: "unhandledRejection" });
-  console.error("Unhandled rejection:", reason);
+  logError("unhandled rejection", reason);
 });
 
 // Platforms assign the port; binding anything else usually fails to boot.
 const port = Number(process.env.PORT ?? 3000);
 
-createHttpServer(createHandler({ reporter })).listen(port, () => {
+createHttpServer(createHandler()).listen(port, () => {
   console.error(`Bannerbear MCP ${VERSION} ready (http, port ${port})`);
 });
