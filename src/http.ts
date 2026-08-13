@@ -3,7 +3,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { BannerbearError, RateWindow, type BannerbearClient } from "./client.js";
 import { logError } from "./observability.js";
-import { filterToolsByScopes, scopesFromAccount } from "./scopes.js";
+import { TOOL_SCOPES, filterToolsByScopes, scopesFromAccount } from "./scopes.js";
 import { VERSION, createServer, normalizeEmptyArguments } from "./server.js";
 
 /**
@@ -24,6 +24,44 @@ export const bearerApiKey: ResolveApiKey = (req) => {
   const header = req.headers.authorization;
   return header?.startsWith("Bearer ") ? header.slice(7).trim() || null : null;
 };
+
+/**
+ * The authorization server clients should get a token from. Bannerbear's own,
+ * since it holds the accounts — this server issues nothing and only ever checks
+ * what it is handed.
+ */
+const AUTHORIZATION_SERVER =
+  process.env.MCP_AUTHORIZATION_SERVER ?? "https://app.bannerbear.com";
+
+const RESOURCE_METADATA_PATH = "/.well-known/oauth-protected-resource";
+
+/**
+ * RFC 9728 protected resource metadata: how an unauthenticated client discovers
+ * where to authenticate. Paired with the `resource_metadata` hint on the 401,
+ * it is the whole of the discovery flow — a client that has never seen this
+ * server can go from a bare URL to a token without being told anything else.
+ *
+ * `resource` comes from the configured host rather than the request's Host
+ * header. Reflecting an arbitrary Host would let a caller mint metadata naming
+ * a resource this server does not answer to.
+ */
+export function resourceMetadata(host: string) {
+  return {
+    resource: `https://${host}`,
+    authorization_servers: [AUTHORIZATION_SERVER],
+    scopes_supported: [...new Set(Object.values(TOOL_SCOPES))].sort(),
+    bearer_methods_supported: ["header"],
+    resource_name: "Bannerbear",
+  };
+}
+
+/**
+ * The 401 challenge. Naming the metadata document is what turns a bare refusal
+ * into something a client can act on: without it there is nothing to follow,
+ * and the only route back is a human pasting a key.
+ */
+export const challenge = (host: string) =>
+  `Bearer resource_metadata="https://${host}${RESOURCE_METADATA_PATH}"`;
 
 /** Parses MCP_PUBLIC_HOST, which may name several hosts. */
 export function hostsFromEnv(value = process.env.MCP_PUBLIC_HOST): string[] {
@@ -166,6 +204,19 @@ export function createHandler(opts: HandlerOptions = {}) {
       return;
     }
 
+    // Public discovery, unauthenticated by definition — a client fetches this
+    // precisely because it has no credential yet. Served before the host check
+    // for the same reason: it must answer on whichever name the client reached.
+    if (req.method === "GET" && req.url?.startsWith(RESOURCE_METADATA_PATH)) {
+      res
+        .writeHead(200, {
+          "content-type": "application/json",
+          "cache-control": "public, max-age=3600",
+        })
+        .end(JSON.stringify(resourceMetadata(allowedHosts[0])));
+      return;
+    }
+
     // Check the origin before doing any work on its behalf — including the
     // /account call authentication needs. A rebound origin should not get to
     // probe whether a key is valid, and a host mismatch should not be masked by
@@ -196,7 +247,7 @@ export function createHandler(opts: HandlerOptions = {}) {
     if (!apiKey) {
       res
         .writeHead(401, {
-          "WWW-Authenticate": "Bearer",
+          "WWW-Authenticate": challenge(allowedHosts[0]),
           "content-type": "application/json",
         })
         .end(JSON.stringify({ error: "Unauthorized" }));
@@ -224,10 +275,10 @@ export function createHandler(opts: HandlerOptions = {}) {
       await server.close();
       res
         .writeHead(401, {
-          "WWW-Authenticate": "Bearer",
+          "WWW-Authenticate": challenge(allowedHosts[0]),
           "content-type": "application/json",
         })
-        .end(JSON.stringify({ error: "Invalid API key" }));
+        .end(JSON.stringify({ error: "Invalid credential" }));
       return;
     }
     // Narrow before connecting, so the first tools/list is already correct

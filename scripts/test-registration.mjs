@@ -242,6 +242,45 @@ check(
   );
 }
 
+// --- OAuth discovery ---------------------------------------------------------
+// A client arriving with no credential has to be able to find its way to one.
+// The 401 names the metadata document, the document names the authorization
+// server; break either link and the only route left is a human pasting a key.
+{
+  const { resourceMetadata, challenge } = await import("../dist/http.js");
+  const meta = resourceMetadata("mcp.bannerbear.com");
+
+  check(
+    "metadata identifies this resource and where to authenticate",
+    meta.resource === "https://mcp.bannerbear.com" &&
+      Array.isArray(meta.authorization_servers) &&
+      meta.authorization_servers.length === 1,
+    JSON.stringify(meta)
+  );
+
+  check(
+    "the 401 challenge points at the metadata document",
+    challenge("mcp.bannerbear.com") ===
+      'Bearer resource_metadata="https://mcp.bannerbear.com/.well-known/oauth-protected-resource"',
+    challenge("mcp.bannerbear.com")
+  );
+
+  // The advertised scopes are what this server actually enforces, so a consent
+  // screen built from them grants exactly what the tool filter reads back.
+  const enforced = [...new Set(Object.values(TOOL_SCOPES))].sort();
+  check(
+    "advertised scopes are the ones the tools are gated on",
+    JSON.stringify(meta.scopes_supported) === JSON.stringify(enforced),
+    `advertised ${JSON.stringify(meta.scopes_supported)}`
+  );
+
+  check(
+    "no scope is advertised that no tool requires",
+    meta.scopes_supported.every((s) => enforced.includes(s)),
+    "an unenforceable scope is being advertised"
+  );
+}
+
 // --- a deployment can answer to more than one hostname -----------------------
 // Comparing a proxied hostname against the origin's own is how a proxy problem
 // is told apart from an origin one, and the rebinding check has to allow both

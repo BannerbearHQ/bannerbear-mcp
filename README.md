@@ -109,6 +109,28 @@ deployment can be told apart from an outage. Everything else without a
 credential is `401` — visiting the host in a browser gives
 `{"error":"Unauthorized"}`, which is correct rather than a symptom.
 
+**OAuth discovery is served, so a client can find its own way to a token.**
+`GET /.well-known/oauth-protected-resource` (RFC 9728) names this resource and
+points at the authorization server — Bannerbear's own, since that is where
+accounts live. Both `401`s carry the matching hint:
+
+```
+WWW-Authenticate: Bearer resource_metadata="https://mcp.bannerbear.com/.well-known/oauth-protected-resource"
+```
+
+Together those are the whole discovery flow: a client that has never seen this
+server goes from a bare URL to a token without being told anything else, which
+is what the Claude connector directory requires. Override the authorization
+server with `MCP_AUTHORIZATION_SERVER`.
+
+The advertised scopes are generated from `TOOL_SCOPES`, so a consent screen
+built from them grants exactly what the tool filter later reads back — there is
+no second vocabulary to keep in step.
+
+Credential handling did not change for this. The bearer is treated as opaque and
+proven against `/account`, so an access token and an API key travel the same
+path; the API accepting both is what makes that work.
+
 **Keys are proven before anything is served.** `/account` answers on any valid
 key regardless of scope, so it doubles as the authentication check: a `401` from
 it means the key is bad, and the request is refused before a client is
