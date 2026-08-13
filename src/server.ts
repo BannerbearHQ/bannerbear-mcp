@@ -10,7 +10,7 @@ import { registerAssetTools } from "./tools/assets.js";
 import { registerPublicationTools } from "./tools/publications.js";
 import { registerToolkitTools } from "./tools/toolkit.js";
 
-export const VERSION = "0.7.0";
+export const VERSION = "0.8.0";
 
 export interface ServerOptions {
   /** The key this instance acts as. One key per instance, never process-wide. */
