@@ -78,14 +78,17 @@ const hostedHandles = createServer({
   pollMediaJobs: false,
 }).handles;
 
+// Test the mechanism, not today's policy: both deployments poll now, but the
+// option is what a short-lived host would reach for, so it has to actually
+// drive the default rather than being decorative.
 check(
-  "stdio polls media jobs to completion by default",
+  "pollMediaJobs true makes the media tools wait",
   waitDefault(localHandles, "trim_video") === true,
   `got ${waitDefault(localHandles, "trim_video")}`
 );
 
 check(
-  "hosted returns the job uid instead of holding a poll",
+  "pollMediaJobs false makes them return the uid instead",
   waitDefault(hostedHandles, "trim_video") === false,
   `got ${waitDefault(hostedHandles, "trim_video")}`
 );

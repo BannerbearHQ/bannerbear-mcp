@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { BannerbearClient } from "../client.js";
+import { BannerbearError, type BannerbearClient } from "../client.js";
 import {
   describeError,
   fail,
@@ -77,6 +77,13 @@ async function runTool(
     }
     return ok(finished);
   } catch (err) {
+    // Running out of patience is not the same as failing. The job is still
+    // going at Bannerbear, so hand back the last state we saw — which carries
+    // the uid — instead of an error that throws it away and leaves the caller
+    // with nothing to poll.
+    if (err instanceof BannerbearError && err.status === 504 && err.body) {
+      return ok(err.body);
+    }
     return fail(describeError(err));
   }
 }

@@ -140,9 +140,12 @@ export function createHandler(opts: HandlerOptions = {}) {
       // The caller is not on this machine, so a path argument would address
       // the server's disk rather than theirs.
       filesystemTools: false,
-      // A hosted process may be recycled mid-job; the work continues at
-      // Bannerbear either way, so hand back the uid and let them poll.
-      pollMediaJobs: false,
+      // Media jobs finish in seconds in practice — the 900s ceiling is a
+      // worst case, not a norm — so polling saves the caller a round trip on
+      // essentially every run. A job that does outlast the poll is not lost:
+      // it keeps running at Bannerbear and comes back with its uid to collect
+      // via get_tool_job.
+      pollMediaJobs: true,
       rateWindow: windowFor(apiKey),
     });
 

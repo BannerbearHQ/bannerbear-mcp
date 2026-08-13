@@ -30,9 +30,11 @@ export interface ServerOptions {
   /**
    * Whether the media tools poll to completion by default.
    *
-   * False for deployments whose process may not outlive the job — the work
-   * continues at Bannerbear either way, so returning the uid immediately loses
-   * nothing, while a dropped poll loses a finished render.
+   * True everywhere today: these jobs finish in seconds in practice, so
+   * polling saves a round trip on nearly every run, and one that outlasts the
+   * poll returns its uid rather than erroring. Set false for a deployment
+   * whose process is too short-lived to wait — the work continues at
+   * Bannerbear regardless, so only the poll is lost.
    */
   pollMediaJobs: boolean;
   /**
