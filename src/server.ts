@@ -16,7 +16,7 @@ import { registerToolkitTools } from "./tools/toolkit.js";
 import { registerWorkflowTools } from "./tools/workflows.js";
 import { registerAnimationTools } from "./tools/animations.js";
 
-export const VERSION = "0.8.0";
+export const VERSION = "0.9.0";
 
 /**
  * Tool groups, so a deployment can register only what it needs.
