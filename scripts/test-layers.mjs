@@ -10,7 +10,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 const proc = spawn("node", ["dist/index.js"], {
-  env: { ...process.env, BANNERBEAR_API_KEY: "bb_ak_v5_invalid" },
+  // Exercises the whole surface, so ask for it: the default profile is a
+  // curated subset and most of what this file checks lives outside it.
+  env: {
+    ...process.env,
+    BANNERBEAR_API_KEY: "bb_ak_v5_invalid",
+    MCP_TOOL_GROUPS: "all",
+  },
   stdio: ["pipe", "pipe", "pipe"],
 });
 

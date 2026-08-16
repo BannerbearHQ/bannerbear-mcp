@@ -47,7 +47,10 @@ breaking changes without opting in.
 
 ## Tools
 
-58 tools covering all 59 V5 endpoints.
+**17 tools by default**, 58 in total across all 59 V5 endpoints.
+
+The default is the classic working surface — design a template, render from it —
+plus workflows. Everything else is opt-in; see *Registering fewer tools* below.
 
 | Group | Tools |
 | --- | --- |
@@ -79,8 +82,9 @@ A scoped API key sees fewer tools — see below.
 ### Registering fewer tools
 
 Every tool definition is spent on every conversation whether it gets used or
-not — all 58 come to ~14.2k tokens. A deployment that only runs workflows can
-register six of them.
+not, so the default registers four groups rather than ten — 17 tools at ~4.2k
+tokens, against 58 and ~14.2k for the lot. A deployment that only runs
+workflows can go down to six.
 
 Over stdio, set `MCP_TOOL_GROUPS`:
 
@@ -92,8 +96,9 @@ Hosted, the path picks it, so each caller chooses their own surface at connect
 time rather than the deployment choosing for everyone:
 
 ```
-https://mcp.example.com/            all 58 tools   ~14.2k tokens
-https://mcp.example.com/workflows   6 tools         ~1.1k
+https://mcp.example.com/            17 tools   ~4.2k tokens   (default)
+https://mcp.example.com/workflows    6 tools   ~1.1k
+https://mcp.example.com/all         58 tools  ~14.2k
 ```
 
 | Group | Tools | Tokens |
@@ -109,11 +114,17 @@ https://mcp.example.com/workflows   6 tools         ~1.1k
 | `animations` | 7 | ~1,429 |
 | `workflows` | 5 | ~923 |
 
-Two profiles are named: `all` and `workflows` (the workflow tools plus
-`get_account`, so a caller can prove a credential). Anything else is a
-comma-separated list of groups — `account,workflows,generation` composes exactly
-what a caller needs, and no argument about what belongs in a name like "core" is
-required.
+Three profiles are named:
+
+| Profile | Groups | Tools |
+| --- | --- | --- |
+| `default` | account, templates, generation, workflows | 17 |
+| `workflows` | account, workflows | 6 |
+| `all` | every group | 58 |
+
+Anything else is a comma-separated list of groups — `account,workflows,generation`
+composes exactly what a caller needs, so no argument about what belongs in a name
+like "core" is required. Nothing is unreachable: `all` is always there.
 
 A profile shadows the group it is named after, so `workflows` means the pair;
 `workflows_only` reaches the bare group. An unrecognised name is refused — stdio

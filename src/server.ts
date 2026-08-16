@@ -58,10 +58,18 @@ export const TOOL_GROUPS = Object.keys(GROUPS);
  * resolveGroups.
  */
 const PROFILES: Record<string, string[]> = {
-  all: TOOL_GROUPS,
+  // What an unqualified connection gets: the classic working surface — design a
+  // template, render from it — plus workflows, plus the credential check.
+  // Deliberately not everything. The full set is a mouthful of tools to hand
+  // someone who asked for none, and most of it is either composed by workflows
+  // or configured once in the dashboard.
+  default: ["account", "templates", "generation", "workflows"],
   // Workflows compose the rest server-side, so a caller working through them
   // needs the workflow tools and a way to prove their credential, nothing more.
   workflows: ["account", "workflows"],
+  // Nothing is unreachable — this is the escape hatch, and it stays honest
+  // about being the whole surface rather than a recommendation.
+  all: TOOL_GROUPS,
 };
 
 /**
@@ -77,7 +85,7 @@ export function resolveGroups(spec?: string | string[]): string[] {
     .map((n) => n.trim().toLowerCase())
     .filter(Boolean);
 
-  if (names.length === 0) return TOOL_GROUPS;
+  if (names.length === 0) return PROFILES.default;
   if (names.length === 1 && names[0] in PROFILES) return PROFILES[names[0]];
   // A profile shadows the group it is named after, so give the bare group an
   // unambiguous spelling rather than leaving it unreachable.
@@ -178,7 +186,7 @@ export function createServer(opts: ServerOptions): BannerbearServer {
     return tool;
   };
 
-  for (const group of opts.groups ?? TOOL_GROUPS) {
+  for (const group of opts.groups ?? PROFILES.default) {
     GROUPS[group]?.(server, client, opts);
   }
 

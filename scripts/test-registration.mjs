@@ -13,7 +13,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { createServer } from "../dist/server.js";
+import { createServer, resolveGroups } from "../dist/server.js";
 import { RateWindow, isRateLimitedMethod } from "../dist/client.js";
 import { TOOL_SCOPES } from "../dist/scopes.js";
 
@@ -28,12 +28,16 @@ const check = (label, pass, detail) => {
   }
 };
 
+// These checks are about the capability gates, not the profile, so they ask
+// for every group — the default is a curated subset and most of what they
+// assert lives outside it.
 const build = (over) =>
   Object.keys(
     createServer({
       apiKey: "bb_ak_v5_test",
       filesystemTools: true,
       pollMediaJobs: true,
+      groups: resolveGroups("all"),
       ...over,
     }).handles
   );
@@ -77,11 +81,13 @@ const localHandles = createServer({
   apiKey: "bb_ak_v5_test",
   filesystemTools: true,
   pollMediaJobs: true,
+  groups: resolveGroups("all"),
 }).handles;
 const hostedHandles = createServer({
   apiKey: "bb_ak_v5_test",
   filesystemTools: false,
   pollMediaJobs: false,
+  groups: resolveGroups("all"),
 }).handles;
 
 // Test the mechanism, not today's policy: both deployments poll now, but the
@@ -259,11 +265,52 @@ check(
       }).handles
     ).length;
 
-  const everything = size(resolveGroups(undefined));
+
+  const dflt = size(resolveGroups(undefined));
+  const everything = size(resolveGroups("all"));
   check(
-    "no spec registers everything",
-    everything === size(resolveGroups("all")) && everything > 40,
-    `${everything} tools`
+    "the default is a curated set, not everything",
+    dflt === size(resolveGroups("default")) && dflt < everything && dflt > 10,
+    `default ${dflt}, all ${everything}`
+  );
+
+  // The default has to be able to do the obvious thing end to end: prove a
+  // credential, design a template, render from it, run a workflow.
+  const inDefault = Object.keys(
+    createServer({
+      apiKey: "bb_ak_v5_test",
+      filesystemTools: true,
+      pollMediaJobs: true,
+      groups: resolveGroups(undefined),
+    }).handles
+  );
+  const essential = [
+    "get_account",
+    "list_templates",
+    "upsert_image_template",
+    "generate_image",
+    "create_batch",
+    "list_workflows",
+    "run_workflow",
+  ];
+  check(
+    "the default covers designing, rendering and running a workflow",
+    essential.every((n) => inDefault.includes(n)),
+    `missing: ${essential.filter((n) => !inDefault.includes(n)).join(", ")}`
+  );
+
+  check(
+    "and leaves out what is configured once or composed by workflows",
+    ["create_webhook", "create_instant_url", "trim_video", "generate_animation"].every(
+      (n) => !inDefault.includes(n)
+    ),
+    `unexpectedly present: ${["create_webhook", "create_instant_url", "trim_video", "generate_animation"].filter((n) => inDefault.includes(n)).join(", ")}`
+  );
+
+  check(
+    "nothing is unreachable — all still registers every group",
+    everything > 50 && resolveGroups("all").length === TOOL_GROUPS.length,
+    `${everything} tools across ${resolveGroups("all").length} groups`
   );
 
   const workflows = size(resolveGroups("workflows"));
@@ -312,7 +359,7 @@ check(
 
   check(
     "every group in the profile map is a real group",
-    ["all", "workflows"].every((p) =>
+    ["all", "default", "workflows"].every((p) =>
       resolveGroups(p).every((g) => TOOL_GROUPS.includes(g))
     ),
     "a profile references a group that does not exist"
@@ -330,6 +377,7 @@ check(
       apiKey: "bb_ak_v5_test",
       filesystemTools: false,
       pollMediaJobs: true,
+      groups: resolveGroups("all"),
     }).handles;
 
   const enabled = (h) => Object.values(h).filter((t) => t.enabled).length;
