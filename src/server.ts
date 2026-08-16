@@ -5,7 +5,11 @@ import { BannerbearClient, type RateWindow } from "./client.js";
 import { applyScopeFilter } from "./scopes.js";
 import { registerTemplateTools } from "./tools/templates.js";
 import { registerGenerationTools } from "./tools/generate.js";
-import { registerWorkspaceTools } from "./tools/workspace.js";
+import {
+  registerAccountTools,
+  registerWebhookTools,
+  registerInstantUrlTools,
+} from "./tools/workspace.js";
 import { registerAssetTools } from "./tools/assets.js";
 import { registerPublicationTools } from "./tools/publications.js";
 import { registerToolkitTools } from "./tools/toolkit.js";
@@ -27,7 +31,9 @@ const GROUPS: Record<
   string,
   (server: McpServer, client: BannerbearClient, opts: ServerOptions) => void
 > = {
-  workspace: (s, c) => registerWorkspaceTools(s, c),
+  account: (s, c) => registerAccountTools(s, c),
+  webhooks: (s, c) => registerWebhookTools(s, c),
+  instant_urls: (s, c) => registerInstantUrlTools(s, c),
   templates: (s, c) => registerTemplateTools(s, c),
   generation: (s, c) => registerGenerationTools(s, c),
   assets: (s, c, o) => registerAssetTools(s, c, { filesystem: o.filesystemTools }),
@@ -39,13 +45,23 @@ const GROUPS: Record<
 
 export const TOOL_GROUPS = Object.keys(GROUPS);
 
-/** Named shorthands for the two splits that actually come up. */
+/**
+ * Named shorthands, kept deliberately few.
+ *
+ * A profile earns its place by describing a way of working, not by being a
+ * convenient subset — a name like "core" invites an argument about what belongs
+ * in it that a group list settles precisely. Anything not named here is still
+ * reachable as a comma-separated list of groups.
+ *
+ * A profile name shadows a group of the same name, so `workflows` here means
+ * the pair. The group alone is reachable as `workflows_only` — see
+ * resolveGroups.
+ */
 const PROFILES: Record<string, string[]> = {
   all: TOOL_GROUPS,
-  core: TOOL_GROUPS.filter((g) => g !== "media"),
-  // Workflows compose the media tools server-side, so a caller who works
-  // through them needs neither the parts nor much else.
-  workflows: ["workspace", "workflows"],
+  // Workflows compose the rest server-side, so a caller working through them
+  // needs the workflow tools and a way to prove their credential, nothing more.
+  workflows: ["account", "workflows"],
 };
 
 /**
@@ -63,13 +79,20 @@ export function resolveGroups(spec?: string | string[]): string[] {
 
   if (names.length === 0) return TOOL_GROUPS;
   if (names.length === 1 && names[0] in PROFILES) return PROFILES[names[0]];
+  // A profile shadows the group it is named after, so give the bare group an
+  // unambiguous spelling rather than leaving it unreachable.
+  if (names.length === 1 && names[0].endsWith("_only")) {
+    const bare = names[0].slice(0, -"_only".length);
+    if (TOOL_GROUPS.includes(bare)) return [bare];
+  }
 
   const unknown = names.filter((n) => !TOOL_GROUPS.includes(n));
   if (unknown.length) {
     throw new Error(
       `Unknown tool group(s): ${unknown.join(", ")}. ` +
-        `Expected a profile (${Object.keys(PROFILES).join(", ")}) ` +
-        `or any of: ${TOOL_GROUPS.join(", ")}.`
+        `Expected a profile (${Object.keys(PROFILES).join(", ")}), ` +
+        `any of: ${TOOL_GROUPS.join(", ")}, ` +
+        `or <group>_only to select a single group a profile shadows.`
     );
   }
   // Registration order follows GROUPS, not the order they were asked for.

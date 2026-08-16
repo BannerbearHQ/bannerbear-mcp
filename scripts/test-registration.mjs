@@ -266,16 +266,28 @@ check(
     `${everything} tools`
   );
 
-  const core = size(resolveGroups("core"));
+  const workflows = size(resolveGroups("workflows"));
   check(
-    "core drops the media family and keeps the rest",
-    core < everything && core > 20,
-    `core ${core}, all ${everything}`
+    "the workflows profile is the workflow tools plus a credential check",
+    workflows === 6,
+    `${workflows} tools`
+  );
+
+  check(
+    "a profile shadows its group, and <group>_only reaches past it",
+    size(resolveGroups("workflows_only")) === 5 && workflows === 6,
+    `workflows_only ${size(resolveGroups("workflows_only"))}, workflows ${workflows}`
+  );
+
+  check(
+    "workspace is split, so account comes without the setup tools",
+    size(resolveGroups("account")) === 1,
+    `account group registers ${size(resolveGroups("account"))} tools`
   );
 
   check(
     "an explicit list registers only those groups",
-    size(resolveGroups("templates,generation")) < core,
+    size(resolveGroups("templates,generation")) < workflows + 10,
     `${size(resolveGroups("templates,generation"))} tools`
   );
 
@@ -300,7 +312,7 @@ check(
 
   check(
     "every group in the profile map is a real group",
-    ["all", "core", "media"].every((p) =>
+    ["all", "workflows"].every((p) =>
       resolveGroups(p).every((g) => TOOL_GROUPS.includes(g))
     ),
     "a profile references a group that does not exist"

@@ -38,7 +38,7 @@ const instantUrlShape = {
   expires_at: z.string().nullable().optional().describe("ISO 8601 timestamp"),
 };
 
-export function registerWorkspaceTools(
+export function registerAccountTools(
   server: McpServer,
   client: BannerbearClient
 ) {
@@ -56,7 +56,12 @@ export function registerWorkspaceTools(
     async () => guard(() => client.request("GET", "/account"))
   );
 
-  // --- Webhooks -------------------------------------------------------------
+}
+
+export function registerWebhookTools(
+  server: McpServer,
+  client: BannerbearClient
+) {
   server.registerTool(
     "list_webhooks",
     { title: "List webhooks", description: "List webhooks.", inputSchema: { ...pageParam } },
@@ -107,7 +112,12 @@ export function registerWorkspaceTools(
       })
   );
 
-  // --- Instant URLs ---------------------------------------------------------
+}
+
+export function registerInstantUrlTools(
+  server: McpServer,
+  client: BannerbearClient
+) {
   server.registerTool(
     "list_instant_urls",
     { title: "List Instant URLs", description: "List Instant URLs.", inputSchema: { ...pageParam } },

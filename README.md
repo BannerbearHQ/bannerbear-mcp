@@ -79,32 +79,50 @@ A scoped API key sees fewer tools — see below.
 ### Registering fewer tools
 
 Every tool definition is spent on every conversation whether it gets used or
-not — all 46 come to ~12k tokens, and the media family alone is 45% of that. A
-deployment that never touches video can leave those seventeen unregistered.
+not — all 58 come to ~14.2k tokens. A deployment that only runs workflows can
+register six of them.
 
 Over stdio, set `MCP_TOOL_GROUPS`:
 
 ```sh
-MCP_TOOL_GROUPS=core npx -y @bannerbear/mcp
+MCP_TOOL_GROUPS=workflows npx -y @bannerbear/mcp
 ```
 
-Hosted, the path picks the profile, so each caller chooses their own surface at
-connect time rather than the deployment choosing for everyone:
+Hosted, the path picks it, so each caller chooses their own surface at connect
+time rather than the deployment choosing for everyone:
 
 ```
 https://mcp.example.com/            all 58 tools   ~14.2k tokens
-https://mcp.example.com/core        41 tools        ~8.8k
-https://mcp.example.com/workflows   16 tools        ~2.7k
+https://mcp.example.com/workflows   6 tools         ~1.1k
 ```
 
-Both accept a profile (`all`, `core`, `workflows`) or a comma-separated list of
-groups: `workspace`, `templates`, `generation`, `assets`, `publications`,
-`media`, `animations`, `workflows`. An unrecognised name is refused — stdio won't start, hosted answers
-`404` naming the valid options — because a typo that quietly halves the tool
-list looks like a broken server rather than a config mistake.
+| Group | Tools | Tokens |
+| --- | --- | --- |
+| `account` | 1 | ~129 |
+| `webhooks` | 5 | ~782 |
+| `instant_urls` | 5 | ~869 |
+| `templates` | 5 | ~1,426 |
+| `generation` | 6 | ~1,770 |
+| `assets` | 4 | ~907 |
+| `publications` | 3 | ~524 |
+| `media` | 17 | ~5,489 |
+| `animations` | 7 | ~1,429 |
+| `workflows` | 5 | ~923 |
+
+Two profiles are named: `all` and `workflows` (the workflow tools plus
+`get_account`, so a caller can prove a credential). Anything else is a
+comma-separated list of groups — `account,workflows,generation` composes exactly
+what a caller needs, and no argument about what belongs in a name like "core" is
+required.
+
+A profile shadows the group it is named after, so `workflows` means the pair;
+`workflows_only` reaches the bare group. An unrecognised name is refused — stdio
+won't start, hosted answers `404` naming the valid options — because a typo that
+quietly halves the tool list looks like a broken server rather than a config
+mistake.
 
 Scoped credentials narrow the list too, and the two compose: a token without
-`tools:*` loses the media tools whether or not the profile included them.
+`workflows:*` loses those tools whether or not the profile included them.
 
 ### Running it as a hosted endpoint
 
