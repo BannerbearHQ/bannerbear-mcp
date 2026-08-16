@@ -77,6 +77,22 @@ export const TOOL_SCOPES: Record<string, string> = {
   add_cover_art: "tools:write",
   get_tool_job: "tools:read",
   list_tool_jobs: "tools:read",
+
+  // Running a workflow dispatches work, so it counts as a write; reading a
+  // definition or a past run is a read.
+  list_workflows: "workflows:read",
+  get_workflow: "workflows:read",
+  get_workflow_run: "workflows:read",
+  list_workflow_runs: "workflows:read",
+  run_workflow: "workflows:write",
+
+  generate_animation: "animations:write",
+  get_animation: "animations:read",
+  list_animations: "animations:read",
+  list_animation_templates: "animation_templates:read",
+  get_animation_template: "animation_templates:read",
+  upsert_animation_template: "animation_templates:write",
+  delete_animation_template: "animation_templates:write",
 };
 
 /**

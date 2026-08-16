@@ -9,6 +9,8 @@ import { registerWorkspaceTools } from "./tools/workspace.js";
 import { registerAssetTools } from "./tools/assets.js";
 import { registerPublicationTools } from "./tools/publications.js";
 import { registerToolkitTools } from "./tools/toolkit.js";
+import { registerWorkflowTools } from "./tools/workflows.js";
+import { registerAnimationTools } from "./tools/animations.js";
 
 export const VERSION = "0.8.0";
 
@@ -31,6 +33,8 @@ const GROUPS: Record<
   assets: (s, c, o) => registerAssetTools(s, c, { filesystem: o.filesystemTools }),
   publications: (s, c) => registerPublicationTools(s, c),
   media: (s, c, o) => registerToolkitTools(s, c, { pollByDefault: o.pollMediaJobs }),
+  animations: (s, c) => registerAnimationTools(s, c),
+  workflows: (s, c) => registerWorkflowTools(s, c),
 };
 
 export const TOOL_GROUPS = Object.keys(GROUPS);
@@ -39,7 +43,9 @@ export const TOOL_GROUPS = Object.keys(GROUPS);
 const PROFILES: Record<string, string[]> = {
   all: TOOL_GROUPS,
   core: TOOL_GROUPS.filter((g) => g !== "media"),
-  media: ["workspace", "media"],
+  // Workflows compose the media tools server-side, so a caller who works
+  // through them needs neither the parts nor much else.
+  workflows: ["workspace", "workflows"],
 };
 
 /**

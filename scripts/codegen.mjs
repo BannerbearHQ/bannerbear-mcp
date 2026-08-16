@@ -94,9 +94,14 @@ if (fingerprint(imageMods) !== fingerprint(batchMods)) {
 }
 
 const imageFormats = body("/images").properties.formats.items.enum;
+const animationFormats = body("/animations").properties.formats.items.enum;
+const animationFrameRates =
+  body("/animation_templates").properties.frame_rate?.enum ?? [24, 30, 60];
 
-// Webhook enums are small but have drifted twice — `video` left when video did,
-// `tool_job` arrived with /tools — so derive them rather than hand-maintaining.
+// Webhook enums are small but keep drifting — `video` left when video did,
+// `tool_job` arrived with /tools, `workflow_run` and `animation` with those, and
+// `scope`/`templates` were dropped outright — so derive them rather than
+// hand-maintaining. The FATAL below is what caught the `scope` removal.
 const webhookProps = body("/webhooks").properties;
 const webhookEnum = (key) => {
   const values = webhookProps[key]?.enum;
@@ -243,6 +248,8 @@ ${shapeFrom(modProps, Object.keys(modProps))}
 export const LayerModification = z.object(modificationShape).passthrough();
 
 export const IMAGE_FORMATS = ${JSON.stringify(imageFormats)} as const;
+export const ANIMATION_FORMATS = ${JSON.stringify(animationFormats)} as const;
+export const ANIMATION_FRAME_RATES = ${JSON.stringify(animationFrameRates)} as const;
 
 /** Content types POST /assets accepts; anything else is a 415. */
 export const ASSET_MIME_TYPES = ${JSON.stringify(assetMimeTypes)} as const;
@@ -251,7 +258,6 @@ export const ASSET_MIME_TYPES = ${JSON.stringify(assetMimeTypes)} as const;
 export const WEBHOOK_RESOURCES = ${JSON.stringify(webhookEnum("resource"))} as const;
 export const WEBHOOK_EVENTS = ${JSON.stringify(webhookEnum("event"))} as const;
 export const WEBHOOK_STATUSES = ${JSON.stringify(webhookEnum("status"))} as const;
-export const WEBHOOK_SCOPES = ${JSON.stringify(webhookEnum("scope"))} as const;
 
 /**
  * Attributes each layer type accepts. Used to catch attributes that belong to a
@@ -284,5 +290,6 @@ console.log(
     `  ${baseKeys.length} shared base attributes\n` +
     `  ${Object.keys(modProps).length} modification attributes\n` +
     `  ${assetMimeTypes.length} asset mime types: ${assetMimeTypes.join(", ")}\n` +
-    `  webhook resources: ${webhookEnum("resource").join(", ")}`
+    `  webhook resources: ${webhookEnum("resource").join(", ")}\n` +
+    `  animation formats: ${animationFormats.join(", ")}`
 );

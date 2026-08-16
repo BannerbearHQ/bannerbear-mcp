@@ -47,7 +47,7 @@ breaking changes without opting in.
 
 ## Tools
 
-46 tools covering all 46 V5 endpoints.
+58 tools covering all 59 V5 endpoints.
 
 | Group | Tools |
 | --- | --- |
@@ -58,12 +58,21 @@ breaking changes without opting in.
 | Batches | `create_batch`, `get_batch`, `list_batches` |
 | Assets | `upload_asset`, `check_assets`, `get_asset`, `list_assets` |
 | Publications | `list_publications`, `get_publication`, `install_publication` |
+| Workflows | `list_workflows`, `get_workflow`, `run_workflow`, `get_workflow_run`, `list_workflow_runs` |
+| Animations | `generate_animation`, `get_animation`, `list_animations`, `list_animation_templates`, `get_animation_template`, `upsert_animation_template`, `delete_animation_template` |
 | Media tools | `remove_bg`, `create_pdf`, `trim_video`, `crop_video`, `resize_video`, `concat_videos`, `overlay_image`, `overlay_video`, `add_audio`, `generate_voiceover`, `subtitle_video`, `create_video_slideshow`, `apply_color_filter`, `soften_video`, `add_cover_art`, `get_tool_job`, `list_tool_jobs` |
 | Webhooks | `list_webhooks`, `get_webhook`, `create_webhook`, `update_webhook`, `delete_webhook` |
 | Instant URLs | `list_instant_urls`, `get_instant_url`, `create_instant_url`, `update_instant_url`, `delete_instant_url` |
 
-The media tools operate on video, but *video templates* — designing and
-rendering video from a template, as image templates do — are still to come.
+**Workflows are the composed form of the rest.** A user assembles steps in the
+dashboard and `run_workflow` runs them in order, each feeding the next — so
+"run the podcast clip workflow on this video" is one call rather than a chain of
+four with intermediate URLs to thread. `/workflows` serves just those five tools
+plus `get_account`, at ~2.7k tokens against ~14.2k for everything.
+
+Animation templates are keyframed in the dashboard editor; the API manages their
+metadata only, so `upsert_animation_template` takes no layers and a new template
+starts empty.
 
 A scoped API key sees fewer tools — see below.
 
@@ -83,14 +92,14 @@ Hosted, the path picks the profile, so each caller chooses their own surface at
 connect time rather than the deployment choosing for everyone:
 
 ```
-https://mcp.example.com/         all 46 tools   ~12.0k tokens
-https://mcp.example.com/core     29 tools       ~6.5k
-https://mcp.example.com/media    28 tools       ~7.3k
+https://mcp.example.com/            all 58 tools   ~14.2k tokens
+https://mcp.example.com/core        41 tools        ~8.8k
+https://mcp.example.com/workflows   16 tools        ~2.7k
 ```
 
-Both accept a profile (`all`, `core`, `media`) or a comma-separated list of
+Both accept a profile (`all`, `core`, `workflows`) or a comma-separated list of
 groups: `workspace`, `templates`, `generation`, `assets`, `publications`,
-`media`. An unrecognised name is refused — stdio won't start, hosted answers
+`media`, `animations`, `workflows`. An unrecognised name is refused — stdio won't start, hosted answers
 `404` naming the valid options — because a typo that quietly halves the tool
 list looks like a broken server rather than a config mistake.
 

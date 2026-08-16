@@ -4,7 +4,6 @@ import type { BannerbearClient } from "../client.js";
 import {
   WEBHOOK_EVENTS,
   WEBHOOK_RESOURCES,
-  WEBHOOK_SCOPES,
   WEBHOOK_STATUSES,
 } from "../generated/schemas.js";
 import { guard, pageParam } from "./common.js";
@@ -20,15 +19,10 @@ const webhookShape = {
     .optional()
     .describe(
       "Which kind of job fires this webhook — `tool_job` covers the media " +
-        "tools (remove_bg, trim_video, …)"
+        "tools, `workflow_run` a whole workflow, `animation` a rendered animation"
     ),
   event: asEnum(WEBHOOK_EVENTS).optional(),
   status: asEnum(WEBHOOK_STATUSES).optional(),
-  scope: asEnum(WEBHOOK_SCOPES).optional(),
-  templates: z
-    .array(z.string())
-    .optional()
-    .describe("Template UIDs, when scope is specific_templates"),
 };
 
 const instantUrlShape = {
@@ -97,8 +91,6 @@ export function registerWorkspaceTools(
         resource: webhookShape.resource,
         event: webhookShape.event,
         status: webhookShape.status,
-        scope: webhookShape.scope,
-        templates: webhookShape.templates,
       },
     },
     async ({ uid, ...body }) =>
