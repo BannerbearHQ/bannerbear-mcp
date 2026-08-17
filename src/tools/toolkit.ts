@@ -145,7 +145,13 @@ export function registerToolkitTools(
     name: string,
     title: string,
     description: string,
-    inputSchema: Record<string, z.ZodTypeAny>
+    inputSchema: Record<string, z.ZodTypeAny>,
+    /**
+     * Checked before the request goes out. For constraints a JSON Schema can't
+     * express — "use this or that, not both" — where the alternative is the API
+     * silently picking one.
+     */
+    validate?: (body: Record<string, unknown>) => string | null
   ) =>
     server.registerTool(
       name,
@@ -154,16 +160,57 @@ export function registerToolkitTools(
         description,
         inputSchema: { ...inputSchema, ...metadataParam, ...shared },
       },
-      async ({ wait, timeout_seconds, ...body }: any, extra: unknown) =>
-        runTool(
+      async ({ wait, timeout_seconds, ...body }: any, extra: unknown) => {
+        const problem = validate?.(body);
+        if (problem) return fail(problem);
+        return runTool(
           client,
           name,
           body,
           wait,
           timeout_seconds,
           progressReporter(extra)
-        )
+        );
+      }
     );
+
+  /**
+   * Both overlay tools place their overlay either by corner or by pixel, and
+   * the spec says to use one or the other. Sending both leaves the API to
+   * choose, which is exactly the kind of quiet wrong answer that is hard to
+   * trace back from a finished video.
+   */
+  const positionOrCoordinates = (body: Record<string, unknown>) =>
+    body.position !== undefined && (body.x !== undefined || body.y !== undefined)
+      ? "Pass either `position` or `x`/`y`, not both — position wins and the " +
+        "coordinates are ignored, so sending both hides which one applied."
+      : null;
+
+  const placement = {
+    position: z
+      .enum([
+        "top_left", "top_center", "top_right",
+        "center",
+        "bottom_left", "bottom_center", "bottom_right",
+      ])
+      .optional()
+      .describe("Snap to a corner or edge. Use this or x/y, not both."),
+    x: z
+      .number()
+      .int()
+      .optional()
+      .describe("Absolute position from the left. Ignored when position is set."),
+    y: z
+      .number()
+      .int()
+      .optional()
+      .describe("Absolute position from the top. Ignored when position is set."),
+    margin: z
+      .number()
+      .int()
+      .optional()
+      .describe("Gap from the edge when using position. Defaults to 0."),
+  };
 
   asyncTool(
     "remove_bg",
@@ -237,34 +284,43 @@ export function registerToolkitTools(
         .describe("Two or more video URLs, in play order"),
       width: z.number().int().optional().describe("Output width, defaults to 1280"),
       height: z.number().int().optional().describe("Output height, defaults to 720"),
+      fps: z
+        .number()
+        .int()
+        .optional()
+        .describe(
+          "Defaults to the highest frame rate among the inputs, capped at 60"
+        ),
     }
   );
 
   asyncTool(
     "overlay_image",
     "Burn an image onto a video",
-    "Place a logo, watermark or badge over a video at a fixed position.",
+    "Place a logo, watermark or badge over a video. Snap it to a corner with " +
+      "`position`, or place it exactly with x/y.",
     {
       video_url: videoUrl,
       image_url: z.string().describe("Overlay image URL"),
-      x: z.number().int().describe("Left offset in pixels"),
-      y: z.number().int().describe("Top offset in pixels"),
+      ...placement,
       opacity: z.number().min(0).max(1).optional().describe("0.0 to 1.0"),
-    }
+    },
+    positionOrCoordinates
   );
 
   asyncTool(
     "overlay_video",
     "Overlay one video on another",
-    "Layer a video over a base video as picture-in-picture.",
+    "Layer a video over a base video as picture-in-picture. Snap it to a " +
+      "corner with `position`, or place it exactly with x/y.",
     {
       base_video_url: z.string().describe("Base video URL"),
       overlay_video_url: z.string().describe("Overlay video URL"),
-      x: z.number().int().describe("Left offset in pixels"),
-      y: z.number().int().describe("Top offset in pixels"),
+      ...placement,
       scale: z.number().optional().describe("1.0 keeps the overlay's original size"),
       start: z.number().optional().describe("When the overlay begins, in seconds"),
-    }
+    },
+    positionOrCoordinates
   );
 
   asyncTool(

@@ -433,6 +433,45 @@ check(
   badFit.text
 );
 
+// Placement is either a corner or a coordinate pair. Sending both lets the API
+// pick, and a finished video is a slow way to discover which one it picked.
+const bothPlacements = await call("overlay_image", {
+  video_url: "https://x/v.mp4",
+  image_url: "https://x/l.png",
+  position: "top_left",
+  x: 10,
+  y: 10,
+});
+check(
+  "overlay_image refuses position and x/y together",
+  bothPlacements.isError && /not both/.test(bothPlacements.text),
+  bothPlacements.text
+);
+
+const positionOnly = await call("overlay_image", {
+  video_url: "https://x/v.mp4",
+  image_url: "https://x/l.png",
+  position: "bottom_right",
+  margin: 24,
+});
+check(
+  "overlay_image accepts a corner without coordinates",
+  /Bannerbear API error/.test(positionOnly.text),
+  `expected it to reach the API, got: ${positionOnly.text.slice(0, 200)}`
+);
+
+const coordsOnly = await call("overlay_video", {
+  base_video_url: "https://x/a.mp4",
+  overlay_video_url: "https://x/b.mp4",
+  x: 20,
+  y: 40,
+});
+check(
+  "overlay_video still accepts bare coordinates",
+  /Bannerbear API error/.test(coordsOnly.text),
+  `expected it to reach the API, got: ${coordsOnly.text.slice(0, 200)}`
+);
+
 const badOpacity = await call("overlay_image", {
   video_url: "https://x/v.mp4",
   image_url: "https://x/l.png",
