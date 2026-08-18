@@ -662,5 +662,81 @@ check(
   );
 }
 
+// --- generative content can be switched off ---------------------------------
+// Some MCP platforms have a policy against generative tools. Gating only the
+// modification path would be theatre: a prompt saved onto a template generates
+// on every later render with no modification involved.
+{
+  const { findGenerativeFields } = await import("../dist/tools/common.js");
+
+  check(
+    "an ai-prompt is caught, and the message names where",
+    (findGenerativeFields([{ name: "bg", "ai-prompt": "a cat" }], "objects") ?? "")
+      .includes("objects[0]"),
+    findGenerativeFields([{ name: "bg", "ai-prompt": "a cat" }], "objects")
+  );
+
+  check(
+    "enabling AI background generation is caught too",
+    findGenerativeFields([{ "ai-background-generate": "enabled" }], "objects") !== null,
+    "the switch that turns generation on was allowed through"
+  );
+
+  check(
+    "explicitly disabling it is not an offence",
+    findGenerativeFields([{ "ai-background-generate": "disabled" }], "objects") === null,
+    "turning generation off was treated as turning it on"
+  );
+
+  check(
+    "background removal and face detection are untouched",
+    findGenerativeFields(
+      [{ "ai-background-remove": "enabled", "ai-detect": "face", "ai-detect-zoom": "auto" }],
+      "objects"
+    ) === null,
+    "a non-generative ai-* field was refused"
+  );
+
+  check(
+    "ordinary modifications pass, and a non-array is ignored",
+    findGenerativeFields([{ name: "title", text: "hi" }], "objects") === null &&
+      findGenerativeFields(undefined, "objects") === null,
+    "a harmless payload was refused"
+  );
+
+  const withGen = Object.keys(
+    createServer({
+      apiKey: "bb_ak_v5_test",
+      filesystemTools: false,
+      pollMediaJobs: true,
+      groups: resolveGroups("all"),
+    }).handles
+  );
+  const withoutGen = Object.keys(
+    createServer({
+      apiKey: "bb_ak_v5_test",
+      filesystemTools: false,
+      pollMediaJobs: true,
+      groups: resolveGroups("all"),
+      allowGenerative: false,
+    }).handles
+  );
+  check(
+    "generate_voiceover is unregistered when generation is off",
+    withGen.includes("generate_voiceover") &&
+      !withoutGen.includes("generate_voiceover") &&
+      withoutGen.length === withGen.length - 1,
+    `with ${withGen.length}, without ${withoutGen.length}`
+  );
+
+  check(
+    "and nothing else is removed — remove_bg strips, it does not create",
+    ["remove_bg", "generate_image", "generate_animation"].every((n) =>
+      withoutGen.includes(n)
+    ),
+    "a non-generative tool was dropped"
+  );
+}
+
 console.log(failures ? `\n${failures} failing` : "\nall checks passed");
 process.exit(failures ? 1 : 0);

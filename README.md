@@ -135,6 +135,34 @@ mistake.
 Scoped credentials narrow the list too, and the two compose: a token without
 `workflows:*` loses those tools whether or not the profile included them.
 
+### Switching off generative content
+
+Some MCP platforms have a policy against tools that synthesise new content. Add
+`?disable-generative=true` to the URL, or set `MCP_DISABLE_GENERATIVE=1` over
+stdio:
+
+```
+https://mcp.example.com/?disable-generative=true
+https://mcp.example.com/workflows?disable-generative=true
+```
+
+It refuses `ai-prompt` and `ai-background-generate: enabled` in modifications
+*and* in template layers, and leaves `generate_voiceover` unregistered. Gating
+only modifications would be theatre — a prompt saved onto a template generates
+on every later render with no modification involved — and leaving speech
+synthesis registered while refusing image prompts would be an inconsistent line.
+
+Untouched: `ai-background-remove` and the `ai-detect*` family, which analyse or
+strip imagery the caller already supplied. `remove_bg` stays for the same
+reason. A policy against generative tools is not a policy against cropping to a
+face.
+
+The flag fails safe. Present means on, unless explicitly `false` or `0`, so a
+typo cannot quietly re-enable what a policy forbids. Refusals name the offending
+index and say the restriction belongs to the deployment rather than the account
+— otherwise a caller reasonably retries, or concludes their plan lacks the
+feature.
+
 ### Running it as a hosted endpoint
 
 The same tools serve two shapes. `dist/index.js` is the stdio binary above.

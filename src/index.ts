@@ -52,6 +52,10 @@ const { server, applyScopes } = createServer({
   filesystemTools: true,
   pollMediaJobs: true,
   groups,
+  // Same fail-safe reading as the hosted flag: set means off.
+  allowGenerative: !["1", "true", "yes"].includes(
+    (process.env.MCP_DISABLE_GENERATIVE ?? "").toLowerCase()
+  ),
 });
 
 const transport = new StdioServerTransport();

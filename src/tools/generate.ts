@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { type BannerbearClient, SyncTimeoutError } from "../client.js";
 import { IMAGE_FORMATS } from "../generated/schemas.js";
-import { guard, pageParam } from "./common.js";
+import { fail, findGenerativeFields, guard, pageParam } from "./common.js";
 
 /**
  * Modification targets are kept as open objects rather than expanding all 103
@@ -50,10 +50,24 @@ const imageCreateShape = {
   version: z.number().int().optional(),
 };
 
+export interface GenerationOptions {
+  /**
+   * Whether AI image generation may be requested. False where the deployment
+   * is subject to a policy against generative tools — some MCP platforms have
+   * one — in which case `ai-prompt` is refused before the request goes out.
+   */
+  allowGenerative: boolean;
+}
+
 export function registerGenerationTools(
   server: McpServer,
-  client: BannerbearClient
+  client: BannerbearClient,
+  opts: GenerationOptions = { allowGenerative: true }
 ) {
+  const generativeNote = opts.allowGenerative
+    ? ""
+    : " AI image generation is switched off on this connection: `ai-prompt` " +
+      "in a modification is refused.";
   server.registerTool(
     "generate_image",
     {
@@ -64,7 +78,7 @@ export function registerGenerationTools(
         "call; slow renders fall back to async polling automatically. " +
         "Rendering many at once? Use create_batch instead — it takes 100 per " +
         "request, where calling this in a loop is one request each and will " +
-        "be throttled long before it finishes.",
+        "be throttled long before it finishes." + generativeNote,
       inputSchema: {
         ...imageCreateShape,
         wait: z
@@ -76,8 +90,15 @@ export function registerGenerationTools(
           ),
       },
     },
-    async ({ wait, ...body }) =>
-      guard(async () => {
+    async ({ wait, ...body }) => {
+      if (!opts.allowGenerative) {
+        const problem = findGenerativeFields(
+          (body as any)?.modifications?.objects,
+          "modifications.objects"
+        );
+        if (problem) return fail(problem);
+      }
+      return guard(async () => {
         if (!wait) {
           return client.request("POST", "/images", { body });
         }
@@ -89,7 +110,8 @@ export function registerGenerationTools(
           const queued = await client.request<any>("POST", "/images", { body });
           return client.pollUntilDone(`/images/${queued.uid}`);
         }
-      })
+      });
+    }
   );
 
   server.registerTool(
@@ -123,7 +145,8 @@ export function registerGenerationTools(
         "Queue up to 100 images in a single request. Returns the batch uid; " +
         "poll it with get_batch. Prefer this over repeated generate_image " +
         "calls for more than a handful: the whole batch is one request against " +
-        "the rate limit, where the equivalent loop would be one per image.",
+        "the rate limit, where the equivalent loop would be one per image." +
+        generativeNote,
       inputSchema: {
         items: z
           .array(z.object(imageCreateShape).partial({ formats: true }))
@@ -136,14 +159,24 @@ export function registerGenerationTools(
           .describe("Poll until every image in the batch finishes"),
       },
     },
-    async ({ items, wait }) =>
-      guard(async () => {
+    async ({ items, wait }) => {
+      if (!opts.allowGenerative) {
+        for (const [i, item] of (items ?? []).entries()) {
+          const problem = findGenerativeFields(
+            (item as any)?.modifications?.objects,
+            `items[${i}].modifications.objects`
+          );
+          if (problem) return fail(problem);
+        }
+      }
+      return guard(async () => {
         const batch = await client.request<any>("POST", "/batches", {
           body: { type: "images", items },
         });
         if (!wait) return batch;
         return client.pollUntilDone(`/batches/${batch.uid}`, 600_000);
-      })
+      });
+    }
   );
 
   server.registerTool(

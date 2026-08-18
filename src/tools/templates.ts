@@ -11,6 +11,7 @@ import {
 } from "../generated/schemas.js";
 import {
   fail,
+  findGenerativeFields,
   guard,
   ok,
   pageParam,
@@ -105,9 +106,19 @@ function validateLayers(layers: unknown[], where: string): string | null {
   return null;
 }
 
+export interface TemplateOptions {
+  /**
+   * Whether a layer may carry an AI generation prompt. Gating only the
+   * generation tools would be theatre: a prompt saved onto the template
+   * generates on every later render, with no modification involved.
+   */
+  allowGenerative: boolean;
+}
+
 export function registerTemplateTools(
   server: McpServer,
-  client: BannerbearClient
+  client: BannerbearClient,
+  opts: TemplateOptions = { allowGenerative: true }
 ) {
   server.registerTool(
     "get_layer_schema",
@@ -243,6 +254,10 @@ export function registerTemplateTools(
 
       if (body.config?.objects) {
         const problem = validateLayers(body.config.objects, "config.objects");
+        if (problem) return fail(problem);
+      }
+      if (!opts.allowGenerative && body.config?.objects) {
+        const problem = findGenerativeFields(body.config.objects, "config.objects");
         if (problem) return fail(problem);
       }
       return guard(() =>

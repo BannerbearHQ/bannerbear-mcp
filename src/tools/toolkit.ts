@@ -127,6 +127,13 @@ const videoUrl = z.string().describe("Video URL");
 
 export interface ToolkitOptions {
   /**
+   * Whether generative tools may be registered. generate_voiceover synthesises
+   * speech that did not exist before, so a policy against generative tools
+   * covers it as squarely as image generation — leaving it while refusing
+   * ai-prompt would be an inconsistent line.
+   */
+  allowGenerative?: boolean;
+  /**
    * Whether the media tools poll to completion by default. False where the
    * process may be recycled mid-job: the work continues at Bannerbear either
    * way, so returning the uid loses nothing while a dropped poll loses a
@@ -347,7 +354,7 @@ export function registerToolkitTools(
     }
   );
 
-  asyncTool(
+  if (opts.allowGenerative !== false) asyncTool(
     "generate_voiceover",
     "Generate a voiceover",
     "Turn text into spoken audio. Returns an audio URL — feed it to add_audio " +

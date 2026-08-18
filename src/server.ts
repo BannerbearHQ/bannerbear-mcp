@@ -34,12 +34,19 @@ const GROUPS: Record<
   account: (s, c) => registerAccountTools(s, c),
   webhooks: (s, c) => registerWebhookTools(s, c),
   instant_urls: (s, c) => registerInstantUrlTools(s, c),
-  templates: (s, c) => registerTemplateTools(s, c),
-  generation: (s, c) => registerGenerationTools(s, c),
+  templates: (s, c, o) =>
+    registerTemplateTools(s, c, { allowGenerative: o.allowGenerative !== false }),
+  generation: (s, c, o) =>
+    registerGenerationTools(s, c, { allowGenerative: o.allowGenerative !== false }),
   assets: (s, c, o) => registerAssetTools(s, c, { filesystem: o.filesystemTools }),
   publications: (s, c) => registerPublicationTools(s, c),
-  media: (s, c, o) => registerToolkitTools(s, c, { pollByDefault: o.pollMediaJobs }),
-  animations: (s, c) => registerAnimationTools(s, c),
+  media: (s, c, o) =>
+    registerToolkitTools(s, c, {
+      pollByDefault: o.pollMediaJobs,
+      allowGenerative: o.allowGenerative !== false,
+    }),
+  animations: (s, c, o) =>
+    registerAnimationTools(s, c, { allowGenerative: o.allowGenerative !== false }),
   workflows: (s, c) => registerWorkflowTools(s, c),
 };
 
@@ -144,6 +151,13 @@ export interface ServerOptions {
    * for the accepted spellings.
    */
   groups?: string[];
+  /**
+   * Whether AI generation may be requested. False refuses `ai-prompt` in
+   * modifications and in template layers, and leaves generate_voiceover
+   * unregistered — some MCP platforms have a policy against generative tools,
+   * and this is how a deployment satisfies it without a separate build.
+   */
+  allowGenerative?: boolean;
 }
 
 export interface BannerbearServer {

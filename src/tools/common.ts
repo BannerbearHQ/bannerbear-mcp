@@ -84,3 +84,49 @@ export function summariseLayers(source: any): string[] {
     return bits.join(" ");
   });
 }
+
+/**
+ * Fields that make the API synthesise new imagery.
+ *
+ * `ai-prompt` is the one that matters: the layer flag only takes effect when a
+ * prompt is supplied, so refusing prompts refuses generation. The flag is
+ * listed too because setting it is a clear statement of intent, and letting it
+ * through would leave a template primed to generate the moment a prompt arrives
+ * by some other route.
+ *
+ * Deliberately excluded: `ai-background-remove` and the `ai-detect*` family.
+ * Those analyse or strip imagery the caller already supplied — no new content
+ * is created — and a policy against generative tools is not a policy against
+ * cropping to a face.
+ */
+const GENERATIVE_FIELDS = ["ai-prompt", "ai-background-generate"];
+
+/**
+ * Rejects generative fields in a list of layers or modifications.
+ *
+ * Returns an explanation naming the offending index and field, or null. The
+ * message says the restriction is the deployment's rather than the API's — a
+ * caller told only "not allowed" would reasonably retry, or assume their
+ * account lacks the feature.
+ */
+export function findGenerativeFields(
+  objects: unknown,
+  where: string
+): string | null {
+  if (!Array.isArray(objects)) return null;
+  for (const [i, object] of objects.entries()) {
+    if (!object || typeof object !== "object") continue;
+    for (const field of GENERATIVE_FIELDS) {
+      if ((object as Record<string, unknown>)[field] === undefined) continue;
+      // `disabled` is the caller turning generation off, which is the point.
+      if (field === "ai-background-generate" &&
+          (object as Record<string, unknown>)[field] === "disabled") continue;
+      return (
+        `${where}[${i}]: \`${field}\` is not available on this connection. ` +
+        `AI image generation is switched off for this deployment, not for your ` +
+        `account — remove the field, or connect without disable-generative.`
+      );
+    }
+  }
+  return null;
+}

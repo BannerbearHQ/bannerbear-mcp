@@ -246,7 +246,15 @@ export function createHandler(opts: HandlerOptions = {}) {
     // The path selects a tool profile, so each caller chooses their own surface
     // at connect time rather than the deployment choosing for everyone. `/` is
     // everything, which is what every existing client already asks for.
-    const path = (req.url ?? "/").split("?")[0].replace(/\/+$/, "") || "/";
+    const [rawPath, rawQuery = ""] = (req.url ?? "/").split("?");
+    const path = rawPath.replace(/\/+$/, "") || "/";
+    // A restriction flag fails safe: present means on, unless explicitly
+    // switched off. Treating an unrecognised value as "off" would let a typo
+    // silently re-enable the thing a platform policy forbids.
+    const flag = new URLSearchParams(rawQuery).get("disable-generative");
+    const allowGenerative = !(
+      flag !== null && !["false", "0"].includes(flag.toLowerCase())
+    );
     let groups: string[];
     try {
       groups = resolveGroups(path === "/" ? undefined : path.slice(1));
@@ -286,6 +294,7 @@ export function createHandler(opts: HandlerOptions = {}) {
       pollMediaJobs: true,
       rateWindow: windowFor(apiKey),
       groups,
+      allowGenerative,
     });
 
     // Prove the key before serving anything with it. Construction above is

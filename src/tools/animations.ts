@@ -8,6 +8,7 @@ import {
 import {
   describeError,
   fail,
+  findGenerativeFields,
   guard,
   ok,
   pageParam,
@@ -40,9 +41,14 @@ const LayerModification = z
       "get_animation_template to see which layers this template has."
   );
 
+export interface AnimationOptions {
+  allowGenerative: boolean;
+}
+
 export function registerAnimationTools(
   server: McpServer,
-  client: BannerbearClient
+  client: BannerbearClient,
+  opts: AnimationOptions = { allowGenerative: true }
 ) {
   server.registerTool(
     "generate_animation",
@@ -78,6 +84,13 @@ export function registerAnimationTools(
       },
     },
     async ({ wait, timeout_seconds, ...body }, extra): Promise<ToolResult> => {
+      if (!opts.allowGenerative) {
+        const problem = findGenerativeFields(
+          (body as any)?.modifications?.objects,
+          "modifications.objects"
+        );
+        if (problem) return fail(problem);
+      }
       const onProgress = progressReporter(extra);
       try {
         const queued = await client.request<any>("POST", "/animations", { body });
