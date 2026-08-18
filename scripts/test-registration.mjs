@@ -670,6 +670,22 @@ check(
   const { findGenerativeFields } = await import("../dist/tools/common.js");
 
   check(
+    "the refusal does not name the toggle that would lift it",
+    !(findGenerativeFields([{ "ai-prompt": "x" }], "objects") ?? "").match(
+      /disable-generative|chat=/
+    ),
+    findGenerativeFields([{ "ai-prompt": "x" }], "objects")
+  );
+
+  check(
+    "but it does say the limit is the deployment's, not the account's",
+    (findGenerativeFields([{ "ai-prompt": "x" }], "objects") ?? "").includes(
+      "not for your"
+    ),
+    findGenerativeFields([{ "ai-prompt": "x" }], "objects")
+  );
+
+  check(
     "an ai-prompt is caught, and the message names where",
     (findGenerativeFields([{ name: "bg", "ai-prompt": "a cat" }], "objects") ?? "")
       .includes("objects[0]"),

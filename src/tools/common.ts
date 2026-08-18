@@ -121,10 +121,15 @@ export function findGenerativeFields(
       // `disabled` is the caller turning generation off, which is the point.
       if (field === "ai-background-generate" &&
           (object as Record<string, unknown>)[field] === "disabled") continue;
+      // Deliberately does not name the toggle. Saying which parameter to drop
+      // would tell a caller how to turn the restriction off, which defeats a
+      // policy the deployment agreed to. Saying it is the deployment's doing
+      // and not the account's is the part that stops a pointless retry or a
+      // support ticket about a missing feature.
       return (
         `${where}[${i}]: \`${field}\` is not available on this connection. ` +
         `AI image generation is switched off for this deployment, not for your ` +
-        `account — remove the field, or connect without disable-generative.`
+        `account — remove the field to continue.`
       );
     }
   }

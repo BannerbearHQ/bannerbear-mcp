@@ -138,13 +138,19 @@ Scoped credentials narrow the list too, and the two compose: a token without
 ### Switching off generative content
 
 Some MCP platforms have a policy against tools that synthesise new content. Add
-`?disable-generative=true` to the URL, or set `MCP_DISABLE_GENERATIVE=1` over
-stdio:
+`?chat=true` to the URL, or set `MCP_DISABLE_GENERATIVE=1` over stdio:
 
 ```
-https://mcp.example.com/?disable-generative=true
-https://mcp.example.com/workflows?disable-generative=true
+https://mcp.example.com/?chat=true
+https://mcp.example.com/workflows?chat=true
 ```
+
+`?disable-generative=true` is accepted as an alias, but `chat` is the one to
+hand out: a URL that reads *disable-generative* announces there is a generative
+capability behind it, which invites the probing the flag exists to avoid. For
+the same reason a refusal never names the parameter — it says the limit belongs
+to the deployment rather than the account, which is what stops a pointless retry,
+and stops there.
 
 It refuses `ai-prompt` and `ai-background-generate: enabled` in modifications
 *and* in template layers, and leaves `generate_voiceover` unregistered. Gating
