@@ -182,6 +182,7 @@ export function createHandler(opts: HandlerOptions = {}) {
 
   return async function handle(req: IncomingMessage, res: ServerResponse) {
     try {
+      if (insecure(req, res)) return;
       await route(req, res);
     } catch (err) {
       // Node does not await this handler, so an escaping rejection would be an
@@ -197,6 +198,61 @@ export function createHandler(opts: HandlerOptions = {}) {
       }
     }
   };
+
+  /**
+   * Refuses or redirects plaintext, and asserts HSTS on everything else.
+   *
+   * The two cases are not the same. A request with no credential has leaked
+   * nothing, so sending it to the https URL is a kindness. A request that
+   * arrived over http *carrying a bearer token* has already put that token on
+   * the wire in the clear — redirecting would get it re-sent over TLS and let
+   * everyone treat the first attempt as though it never happened. Refusing is
+   * the only response that surfaces a credential worth rotating.
+   *
+   * The scheme comes from `x-forwarded-proto`, which the platform's router
+   * sets. Absent means nothing is fronting this process — local development —
+   * so nothing is enforced.
+   */
+  function insecure(req: IncomingMessage, res: ServerResponse): boolean {
+    const proto = req.headers["x-forwarded-proto"];
+    const scheme = Array.isArray(proto) ? proto[0] : proto;
+    if (!scheme) return false;
+
+    if (scheme.split(",")[0].trim() === "https") {
+      // Browsers that honour this never try http again. MCP clients mostly are
+      // not browsers, so this is a supplement to the checks above, not a
+      // substitute for them.
+      res.setHeader(
+        "Strict-Transport-Security",
+        "max-age=63072000; includeSubDomains"
+      );
+      return false;
+    }
+
+    const host = req.headers.host ?? allowedHosts[0];
+    if (req.headers.authorization) {
+      logError("credential sent over plaintext", new Error("insecure request"), {
+        url: req.url,
+        method: req.method,
+      });
+      res
+        .writeHead(403, { "content-type": "application/json" })
+        .end(
+          JSON.stringify({
+            error: "This endpoint requires HTTPS",
+            detail:
+              "A credential was sent over an unencrypted connection and should " +
+              "be treated as exposed. Rotate it, then reconnect over https.",
+          })
+        );
+      return true;
+    }
+
+    res
+      .writeHead(301, { location: `https://${host}${req.url ?? "/"}` })
+      .end();
+    return true;
+  }
 
   async function route(req: IncomingMessage, res: ServerResponse) {
     // Unauthenticated liveness check. Deliberately bare: it exists so a

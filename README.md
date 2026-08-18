@@ -212,6 +212,19 @@ to probe whether a key is valid. `GET /health` skips both checks — it answers 
 any hostname, which makes it the way to tell "the app is down" from "the app is
 refusing this hostname".
 
+**Plaintext is refused, not quietly upgraded.** A request arriving over `http`
+without a credential is redirected to the `https` URL. One arriving *with* an
+`Authorization` header answers `403` and says the credential should be treated
+as exposed — by then it has already crossed the network in the clear, and
+redirecting would only get it re-sent over TLS while letting the first attempt
+pass unnoticed. Responses over `https` carry HSTS.
+
+The scheme is read from `x-forwarded-proto`, which the platform's router sets.
+Absent means nothing is fronting the process — local development — so nothing is
+enforced. Turn on *Always Use HTTPS* at the CDN as well: that stops plaintext
+before it reaches the origin at all, which is earlier than anything this server
+can do.
+
 `GET /health` answers `200` unauthenticated with the running version, so a
 deployment can be told apart from an outage. Everything else without a
 credential is `401` — visiting the host in a browser gives
