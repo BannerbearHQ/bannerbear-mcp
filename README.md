@@ -157,6 +157,12 @@ strip imagery the caller already supplied. `remove_bg` stays for the same
 reason. A policy against generative tools is not a policy against cropping to a
 face.
 
+`run_workflow` is deliberately not gated. A workflow may contain a generative
+step, but the composition was authored by its owner in the dashboard, and the
+policy these platforms state is against *direct* exposure to generative tools
+rather than against generated output existing. Gating it would break the very
+profile the flag exists to make acceptable.
+
 The flag fails safe. Present means on, unless explicitly `false` or `0`, so a
 typo cannot quietly re-enable what a policy forbids. Refusals name the offending
 index and say the restriction belongs to the deployment rather than the account

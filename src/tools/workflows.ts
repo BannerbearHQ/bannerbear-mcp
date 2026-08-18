@@ -49,6 +49,12 @@ export function registerWorkflowTools(
     async ({ uid }) => guard(() => client.request("GET", `/workflows/${uid}`))
   );
 
+  // Deliberately not gated by allowGenerative. A workflow may well contain a
+  // generative step, but the composition was authored by the user in the
+  // dashboard — the policy Anthropic stated is against *direct* exposure to
+  // generative tools, which is what the gates on generate_image and
+  // generate_voiceover address. Closing this "gap" would break the profile
+  // that the restriction is meant to make acceptable.
   server.registerTool(
     "run_workflow",
     {
