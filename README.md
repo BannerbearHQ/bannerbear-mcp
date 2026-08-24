@@ -16,7 +16,7 @@ templates, in your Bannerbear workspace.
   "mcpServers": {
     "bannerbear": {
       "command": "npx",
-      "args": ["-y", "@bannerbear/mcp@0.9.0"],
+      "args": ["-y", "@bannerbear/mcp@0.10.0"],
       "env": { "BANNERBEAR_API_KEY": "bb_ak_v5_..." }
     }
   }
@@ -28,7 +28,7 @@ Add that to `claude_desktop_config.json` (Claude Desktop), or for Claude Code:
 ```sh
 claude mcp add bannerbear -s user \
   -e BANNERBEAR_API_KEY=bb_ak_v5_... \
-  -- npx -y @bannerbear/mcp@0.9.0
+  -- npx -y @bannerbear/mcp@0.10.0
 ```
 
 Get an API key from your Bannerbear workspace settings. Prefer passing it from
@@ -41,7 +41,7 @@ doesn't end up in your shell history.
 > starts in about a second. Pinning the version as shown also stops npx
 > checking the registry for a newer release on every launch.
 
-Bump the pin to move to a newer release, or drop `@0.9.0` to always track the
+Bump the pin to move to a newer release, or drop `@0.10.0` to always track the
 latest — at the cost of that registry check on each launch, and of picking up
 breaking changes without opting in.
 
