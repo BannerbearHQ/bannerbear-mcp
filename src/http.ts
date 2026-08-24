@@ -5,7 +5,10 @@ import { BannerbearError, RateWindow, type BannerbearClient } from "./client.js"
 import { logError, logInfo } from "./observability.js";
 import { TOOL_SCOPES, filterToolsByScopes, scopesFromAccount } from "./scopes.js";
 import {
+  PROFILE_GROUPS,
+  SUMMARY,
   VERSION,
+  instructionsFor,
   createServer,
   normalizeEmptyArguments,
   resolveGroups,
@@ -75,6 +78,43 @@ export function hostsFromEnv(value = process.env.MCP_PUBLIC_HOST): string[] {
     .map((host) => host.trim())
     .filter(Boolean);
   return hosts.length ? hosts : ["localhost"];
+}
+
+/**
+ * What this endpoint would serve, for an unauthenticated caller deciding
+ * whether it is worth authorizing for.
+ *
+ * A bare "Unauthorized" tells an agent nothing: not what lives here, not
+ * whether a different path suits it better, not where to get a token. Protocol
+ * clients read the status and WWW-Authenticate and ignore the body, so the body
+ * costs them nothing and is the only thing a human or an exploring agent sees.
+ *
+ * Nothing here is account-specific — it is the same list the README publishes,
+ * derived from a server built with no credential and never called.
+ */
+const summaries = new Map<string, { tools: number; names: string[] }>();
+
+function describeEndpoint(
+  groups: string[],
+  filesystemTools: boolean,
+  allowGenerative: boolean
+) {
+  const key = `${groups.join(",")}|${filesystemTools}|${allowGenerative}`;
+  let summary = summaries.get(key);
+  if (!summary) {
+    const names = Object.keys(
+      createServer({
+        apiKey: "",
+        filesystemTools,
+        pollMediaJobs: true,
+        allowGenerative,
+        groups,
+      }).handles
+    );
+    summary = { tools: names.length, names };
+    summaries.set(key, summary);
+  }
+  return summary;
 }
 
 const keyId = (apiKey: string) =>
@@ -334,12 +374,65 @@ export function createHandler(opts: HandlerOptions = {}) {
       apiKey = null;
     }
     if (!apiKey) {
+      const here = describeEndpoint(groups, false, allowGenerative);
       res
         .writeHead(401, {
           "WWW-Authenticate": challenge(allowedHosts[0]),
           "content-type": "application/json",
         })
-        .end(JSON.stringify({ error: "Unauthorized" }));
+        .end(
+          JSON.stringify({
+            error: "Unauthorized",
+            name: "bannerbear",
+            what: SUMMARY,
+            protocol: "Model Context Protocol",
+            transport: "streamable-http",
+            detail:
+              "This endpoint needs an OAuth 2.1 access token, or a Bannerbear " +
+              "API key, sent as `Authorization: Bearer <credential>`.",
+            authorization: {
+              resource_metadata: `https://${allowedHosts[0]}${RESOURCE_METADATA_PATH}`,
+              authorization_server: AUTHORIZATION_SERVER,
+            },
+            endpoint: {
+              path,
+              groups,
+              tools: here.tools,
+              tool_names: here.names,
+              generative: allowGenerative
+                ? "available"
+                : "switched off on this connection",
+            },
+            // The same guidance the handshake returns, so a caller can judge
+            // whether this server does what they need before authorizing.
+            instructions: instructionsFor(groups),
+            connect: {
+              claude_code:
+                `claude mcp add --transport http bannerbear https://${allowedHosts[0]}${path === "/" ? "" : path}`,
+              config: {
+                mcpServers: {
+                  bannerbear: {
+                    type: "http",
+                    url: `https://${allowedHosts[0]}${path === "/" ? "/" : path}`,
+                  },
+                },
+              },
+            },
+            docs: {
+              api: "https://developers.bannerbear.com/v5/",
+              dashboard: AUTHORIZATION_SERVER,
+            },
+            other_paths: Object.fromEntries(
+              Object.entries(PROFILE_GROUPS).map(([name, gs]) => [
+                name === "default" ? "/" : `/${name}`,
+                {
+                  tools: describeEndpoint([...gs], false, allowGenerative).tools,
+                  groups: gs,
+                },
+              ])
+            ),
+          })
+        );
       return;
     }
 

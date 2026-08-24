@@ -18,6 +18,66 @@ import { registerAnimationTools } from "./tools/animations.js";
 
 export const VERSION = "0.9.0";
 
+/** One line on what this server is, for anyone deciding whether to connect. */
+export const SUMMARY =
+  "Bannerbear — generate images and video from templates, and run the " +
+  "workflows a user has composed in their Bannerbear dashboard.";
+
+/**
+ * Returned on the MCP handshake, so every client gets it without asking.
+ *
+ * The standard home for guidance that spans tools rather than sitting inside
+ * one. Tool descriptions can say what a tool does; only this can say which of
+ * several to reach for, and why — the sort of thing that otherwise gets
+ * repeated into every description and still read as advice about one tool.
+ */
+export function instructionsFor(groups: string[]): string {
+  const has = (g: string) => groups.includes(g);
+  const lines = [
+    "Bannerbear renders images and video from templates you design once and " +
+      "then vary per render.",
+  ];
+
+  if (has("workflows")) {
+    lines.push(
+      "Prefer workflows. A workflow is a sequence its owner composed in the " +
+        "dashboard — render an animation, burn subtitles, overlay the two — " +
+        "and run_workflow executes the whole thing from a couple of inputs, " +
+        "threading each step's output into the next. Reaching for the " +
+        "individual steps instead means carrying intermediate URLs by hand, " +
+        "which is where these things go wrong. list_workflows shows what " +
+        "each one accepts."
+    );
+  }
+  if (has("templates") && has("generation")) {
+    lines.push(
+      "To render from a template: list_templates to find it, get_template to " +
+        "learn its layer names, then generate_image targeting those layers. " +
+        "Layer attributes are pulled on demand with get_layer_schema rather " +
+        "than listed up front — call it before designing a layer type."
+    );
+  }
+  if (has("generation")) {
+    lines.push(
+      "Rendering more than a handful at once? create_batch takes 100 per " +
+        "request; the same work as a loop of generate_image calls costs one " +
+        "request against the rate limit instead of a hundred."
+    );
+  }
+  if (has("assets")) {
+    lines.push(
+      "Anything already reachable at a public URL can be referenced directly " +
+        "— upload only what exists solely on this machine."
+    );
+  }
+
+  lines.push(
+    "Long jobs report progress and are polled to completion, so a call that " +
+      "takes minutes returns a finished file rather than a job id."
+  );
+  return lines.join("\n\n");
+}
+
 /**
  * Tool groups, so a deployment can register only what it needs.
  *
@@ -87,6 +147,9 @@ const PROFILES: Record<string, string[]> = {
  * different surface — a typo that quietly removes half the tools is far worse
  * to debug than one that refuses to start.
  */
+/** Profile names and the groups behind them, for describing an endpoint. */
+export const PROFILE_GROUPS: Readonly<Record<string, readonly string[]>> = PROFILES;
+
 export function resolveGroups(spec?: string | string[]): string[] {
   const names = (Array.isArray(spec) ? spec : (spec ?? "").split(","))
     .map((n) => n.trim().toLowerCase())
@@ -187,7 +250,11 @@ export function createServer(opts: ServerOptions): BannerbearServer {
     apiKey: opts.apiKey,
     rateWindow: opts.rateWindow,
   });
-  const server = new McpServer({ name: "bannerbear", version: VERSION });
+  const groups = opts.groups ?? PROFILES.default;
+  const server = new McpServer(
+    { name: "bannerbear", version: VERSION },
+    { instructions: instructionsFor(groups) }
+  );
 
   // Capture each tool handle as it registers. The SDK keeps its registry
   // private and the tool modules have no reason to know scopes exist, so
@@ -200,7 +267,7 @@ export function createServer(opts: ServerOptions): BannerbearServer {
     return tool;
   };
 
-  for (const group of opts.groups ?? PROFILES.default) {
+  for (const group of groups) {
     GROUPS[group]?.(server, client, opts);
   }
 

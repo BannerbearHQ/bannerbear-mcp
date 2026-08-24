@@ -212,6 +212,19 @@ to probe whether a key is valid. `GET /health` skips both checks — it answers 
 any hostname, which makes it the way to tell "the app is down" from "the app is
 refusing this hostname".
 
+**An unauthorized response explains itself.** A bare `401` tells an agent
+nothing about whether authorizing is worth it, so the body carries what this
+path serves — groups, tool count, tool names, whether generation is available —
+the same `instructions` the handshake returns, where to get a token, the other
+paths available, and a copy-paste `claude mcp add` line. Protocol clients read
+the status and `WWW-Authenticate` and ignore the body, so none of this costs
+them anything, and it is all the same information the README publishes.
+
+**Server instructions are set on the handshake**, which is the standard place
+for guidance that spans tools rather than sitting inside one — which of several
+to reach for, and why. They vary by profile: a `/workflows` connection is not
+told about `create_batch`.
+
 **Plaintext is refused, not quietly upgraded.** A request arriving over `http`
 without a credential is redirected to the `https` URL. One arriving *with* an
 `Authorization` header answers `403` and says the credential should be treated

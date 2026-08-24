@@ -13,7 +13,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { createServer, resolveGroups } from "../dist/server.js";
+import { createServer, resolveGroups, TOOL_GROUPS } from "../dist/server.js";
 import { RateWindow, isRateLimitedMethod } from "../dist/client.js";
 import { TOOL_SCOPES } from "../dist/scopes.js";
 
@@ -405,6 +405,29 @@ check(
     "a narrow but valid scope leaves exactly its tools",
     enabled(partial) === 4,
     `${enabled(partial)} tools left`
+  );
+}
+
+// --- an unauthenticated caller can tell what this endpoint is ----------------
+// A bare "Unauthorized" says nothing about whether authorizing is worth it.
+// Protocol clients read the status and WWW-Authenticate and ignore the body, so
+// the body is free to explain — and it is the only thing a human or an
+// exploring agent sees.
+{
+  const { PROFILE_GROUPS } = await import("../dist/server.js");
+
+  check(
+    "every profile is named in the map used to describe alternatives",
+    ["default", "workflows", "all"].every((p) => p in PROFILE_GROUPS),
+    Object.keys(PROFILE_GROUPS).join(", ")
+  );
+
+  check(
+    "and each names real groups",
+    Object.values(PROFILE_GROUPS).every((gs) =>
+      gs.every((g) => TOOL_GROUPS.includes(g))
+    ),
+    "a profile references a group that does not exist"
   );
 }
 
