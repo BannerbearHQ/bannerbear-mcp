@@ -16,7 +16,7 @@ import { registerToolkitTools } from "./tools/toolkit.js";
 import { registerWorkflowTools } from "./tools/workflows.js";
 import { registerAnimationTools } from "./tools/animations.js";
 
-export const VERSION = "0.12.0";
+export const VERSION = "0.13.0";
 
 /** One line on what this server is, for anyone deciding whether to connect. */
 export const SUMMARY =
@@ -60,11 +60,14 @@ export function instructionsFor(groups: string[]): string {
   }
   if (has("publications")) {
     lines.push(
-      "No template to work from? list_publications browses a public library of " +
-        "ready-made ones and install_publication copies one into the workspace, " +
-        "after which it behaves like any other template. Note it lists the " +
-        "public library only — a user's own unlisted publications are not " +
-        "enumerable, so those need a uid from their dashboard."
+      "Nothing to work from? list_publications browses a public library of " +
+        "ready-made designs, filtered by kind, category or name — turn a vague " +
+        "ask into a filter rather than paging through everything. " +
+        "install_publication copies one in, and what it creates follows the " +
+        "publication: an image template, an animation template, or an entire " +
+        "workflow. Note it lists the public library only — a user's own " +
+        "unlisted publications are not enumerable, so those need a uid from " +
+        "their dashboard."
     );
   }
   if (has("animations")) {

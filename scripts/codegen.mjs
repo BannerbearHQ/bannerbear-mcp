@@ -112,6 +112,22 @@ const webhookEnum = (key) => {
   return values;
 };
 
+// The library's filter vocabulary. `kind` went from image-only to three kinds
+// in a single revision and the category list is editorial, so it will grow —
+// derive both, with a FATAL so a rename surfaces at build time rather than as a
+// filter that silently matches nothing.
+const publicationEnum = (name) => {
+  const param = (spec.paths["/publications"].get.parameters ?? [])
+    .map(deref)
+    .find((p) => p?.name === name);
+  const values = deref(param?.schema)?.enum;
+  if (!Array.isArray(values) || values.length === 0) {
+    console.error(`FATAL: GET /publications lost the enum on \`${name}\`.`);
+    process.exit(1);
+  }
+  return values;
+};
+
 // POST /assets declares what it accepts as request content types rather than in
 // a schema, so read the keys. Anything else comes back 415, and knowing the list
 // lets upload_asset reject locally instead of after pushing the bytes.
@@ -254,6 +270,10 @@ export const ANIMATION_FRAME_RATES = ${JSON.stringify(animationFrameRates)} as c
 /** Content types POST /assets accepts; anything else is a 415. */
 export const ASSET_MIME_TYPES = ${JSON.stringify(assetMimeTypes)} as const;
 
+/** Public library filter vocabulary, from GET /publications. */
+export const PUBLICATION_KINDS = ${JSON.stringify(publicationEnum("kind"))} as const;
+export const PUBLICATION_CATEGORIES = ${JSON.stringify(publicationEnum("category"))} as const;
+
 /** Webhook field enums, from POST /webhooks. */
 export const WEBHOOK_RESOURCES = ${JSON.stringify(webhookEnum("resource"))} as const;
 export const WEBHOOK_EVENTS = ${JSON.stringify(webhookEnum("event"))} as const;
@@ -291,5 +311,7 @@ console.log(
     `  ${Object.keys(modProps).length} modification attributes\n` +
     `  ${assetMimeTypes.length} asset mime types: ${assetMimeTypes.join(", ")}\n` +
     `  webhook resources: ${webhookEnum("resource").join(", ")}\n` +
+    `  publication kinds: ${publicationEnum("kind").join(", ")}, ` +
+    `${publicationEnum("category").length} categories\n` +
     `  animation formats: ${animationFormats.join(", ")}`
 );

@@ -16,7 +16,7 @@ templates, in your Bannerbear workspace.
   "mcpServers": {
     "bannerbear": {
       "command": "npx",
-      "args": ["-y", "@bannerbear/mcp@0.12.0"],
+      "args": ["-y", "@bannerbear/mcp@0.13.0"],
       "env": { "BANNERBEAR_API_KEY": "bb_ak_v5_..." }
     }
   }
@@ -28,7 +28,7 @@ Add that to `claude_desktop_config.json` (Claude Desktop), or for Claude Code:
 ```sh
 claude mcp add bannerbear -s user \
   -e BANNERBEAR_API_KEY=bb_ak_v5_... \
-  -- npx -y @bannerbear/mcp@0.12.0
+  -- npx -y @bannerbear/mcp@0.13.0
 ```
 
 Get an API key from your Bannerbear workspace settings. Prefer passing it from
@@ -41,7 +41,7 @@ doesn't end up in your shell history.
 > starts in about a second. Pinning the version as shown also stops npx
 > checking the registry for a newer release on every launch.
 
-Bump the pin to move to a newer release, or drop `@0.12.0` to always track the
+Bump the pin to move to a newer release, or drop `@0.13.0` to always track the
 latest — at the cost of that registry check on each launch, and of picking up
 breaking changes without opting in.
 
@@ -99,9 +99,9 @@ Hosted, the path picks it, so each caller chooses their own surface at connect
 time rather than the deployment choosing for everyone:
 
 ```
-https://mcp.example.com/            30 tools   ~7.7k tokens   (default)
+https://mcp.example.com/            30 tools   ~8.1k tokens   (default)
 https://mcp.example.com/workflows    8 tools   ~1.8k
-https://mcp.example.com/all         63 tools  ~16.8k
+https://mcp.example.com/all         63 tools  ~17.2k
 ```
 
 | Group | Tools | Tokens |
@@ -112,7 +112,7 @@ https://mcp.example.com/all         63 tools  ~16.8k
 | `templates` | 5 | ~1,426 |
 | `generation` | 6 | ~1,770 |
 | `assets` | 4 | ~907 |
-| `publications` | 3 | ~524 |
+| `publications` | 3 | ~901 |
 | `media` | 19 | ~6,590 |
 | `animations` | 8 | ~2,130 |
 | `workflows` | 7 | ~1,694 |
