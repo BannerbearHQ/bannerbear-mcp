@@ -40,13 +40,14 @@ export function instructionsFor(groups: string[]): string {
 
   if (has("workflows")) {
     lines.push(
-      "Prefer workflows. A workflow is a sequence its owner composed in the " +
-        "dashboard — render an animation, burn subtitles, overlay the two — " +
-        "and run_workflow executes the whole thing from a couple of inputs, " +
-        "threading each step's output into the next. Reaching for the " +
-        "individual steps instead means carrying intermediate URLs by hand, " +
-        "which is where these things go wrong. list_workflows shows what " +
-        "each one accepts."
+      "Prefer workflows. A workflow is an ordered sequence — render an " +
+        "animation, burn subtitles, overlay the two — and run_workflow " +
+        "executes the whole thing from a couple of inputs, threading each " +
+        "step's output into the next as {{steps.<key>.<output>}}. Reaching " +
+        "for the individual steps instead means carrying intermediate URLs by " +
+        "hand, which is where these things go wrong. list_workflows shows " +
+        "what each accepts, and upsert_workflow can build one — a repeated " +
+        "request is usually better saved as a workflow than performed again."
     );
   }
   if (has("templates") && has("generation")) {
@@ -60,11 +61,13 @@ export function instructionsFor(groups: string[]): string {
   if (has("animations")) {
     lines.push(
       "Animations render from their own template family and their duration " +
-        "comes from the template's keyframes, not from the render call. Those " +
-        "keyframes are authored in the dashboard editor and cannot be set " +
-        "through the API — upsert_animation_template manages name, size and " +
-        "frame rate only, so a template created here starts empty and has to " +
-        "be finished by hand before it will render anything."
+        "comes from the template's keyframes, not from the render call. For " +
+        "ordinary entrances and exits use animate_template: it applies a " +
+        "named preset across layers, optionally staggered, costs nothing and " +
+        "is deterministic. Hand-written keyframes via upsert_animation_template " +
+        "replace the whole canvas, so read the template back first. Note both " +
+        "default to replacing the timeline — pass merge on animate_template to " +
+        "keep keyframes it does not touch."
     );
   }
   if (has("generation")) {

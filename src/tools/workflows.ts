@@ -131,6 +131,100 @@ export function registerWorkflowTools(
   );
 
   server.registerTool(
+    "upsert_workflow",
+    {
+      title: "Create or update a workflow",
+      description:
+        "Create a workflow, or update one by passing uid. Steps run in array " +
+        "order, and each may reference the workflow's inputs as " +
+        "{{inputs.<name>}} or an EARLIER step's output as " +
+        "{{steps.<key>.<output>}} — a forward reference is rejected. " +
+        "inputs and steps are each replaced wholesale when present and left " +
+        "alone when omitted, so renaming a workflow does not disturb its " +
+        "definition; read it back with get_workflow before editing either.",
+      inputSchema: {
+        uid: z
+          .string()
+          .optional()
+          .describe("Omit to create a new workflow; pass to update an existing one"),
+        name: z.string().optional().describe("Workflow name (required when creating)"),
+        description: z.string().optional(),
+        tags: z.array(z.string()).optional(),
+        inputs: z
+          .record(
+            z.object({
+              type: z
+                .enum(["string", "url", "number", "boolean"])
+                .describe("`url` is validated as an http(s) URL when a run starts"),
+              required: z.boolean().optional(),
+            })
+          )
+          .optional()
+          .describe(
+            "Inputs the workflow accepts, keyed by name. Omit to leave " +
+              "untouched; send {} to clear."
+          ),
+        steps: z
+          .array(
+            z
+              .object({
+                key: z
+                  .string()
+                  .regex(/^[a-z0-9_]+$/)
+                  .describe(
+                    "Stable handle, unique within the workflow. Later steps " +
+                      "reference its output as {{steps.<key>.<output>}}."
+                  ),
+                type: z
+                  .enum(["tool", "image", "animation"])
+                  .describe("What kind of operation this step performs"),
+                ref: z
+                  .string()
+                  .describe(
+                    "A tool slug for `tool` steps, or a template UID for " +
+                      "`image` and `animation` steps"
+                  ),
+                inputs: z
+                  .record(z.any())
+                  .optional()
+                  .describe("Step payload, which may carry {{…}} references"),
+              })
+              .passthrough()
+          )
+          .optional()
+          .describe(
+            "Ordered step list, replaced wholesale. Array order is execution " +
+              "order. Omit to leave the existing steps untouched."
+          ),
+      },
+    },
+    async ({ uid, ...body }) => {
+      if (!uid && !body.name) return fail("name is required when creating a workflow");
+      return guard(() =>
+        uid
+          ? client.request("PATCH", `/workflows/${uid}`, { body })
+          : client.request("POST", "/workflows", { body })
+      );
+    }
+  );
+
+  server.registerTool(
+    "delete_workflow",
+    {
+      title: "Delete a workflow",
+      description:
+        "Discard a workflow. Its past runs are kept, so history survives. " +
+        "Subject to the same api_write_access lock as updating.",
+      inputSchema: { uid: z.string().describe("Workflow UID") },
+    },
+    async ({ uid }) =>
+      guard(async () => {
+        await client.request("DELETE", `/workflows/${uid}`);
+        return { deleted: uid };
+      })
+  );
+
+  server.registerTool(
     "get_workflow_run",
     {
       title: "Get a workflow run",

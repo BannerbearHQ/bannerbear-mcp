@@ -326,6 +326,13 @@ export function registerToolkitTools(
       ...placement,
       scale: z.number().optional().describe("1.0 keeps the overlay's original size"),
       start: z.number().optional().describe("When the overlay begins, in seconds"),
+      when_finished: z
+        .enum(["freeze", "hide", "loop"])
+        .optional()
+        .describe(
+          "What happens once the overlay ends and the base video continues — " +
+            "freeze holds its last frame (default), hide removes it, loop repeats it"
+        ),
     },
     positionOrCoordinates
   );

@@ -68,8 +68,12 @@ for (const [type, keys] of Object.entries(LAYER_TYPE_KEYS)) {
   }
 }
 
-/** Validates layers against the per-type schemas, reporting the first failure precisely. */
-function validateLayers(layers: unknown[], where: string): string | null {
+/**
+ * Validates layers against the per-type schemas, reporting the first failure
+ * precisely. Exported because animation templates now carry the same Layer
+ * union, and a second implementation would drift from this one.
+ */
+export function validateLayers(layers: unknown[], where: string): string | null {
   for (const [i, layer] of layers.entries()) {
     const at = `${where}[${i}]`;
     const type = (layer as any)?.type;

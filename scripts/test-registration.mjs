@@ -315,17 +315,20 @@ check(
     `${everything} tools across ${resolveGroups("all").length} groups`
   );
 
+  // Asserted as a relationship, not a count: the workflow group grows as the
+  // API does, and a hardcoded number fails for the wrong reason every time.
   const workflows = size(resolveGroups("workflows"));
+  const workflowsOnly = size(resolveGroups("workflows_only"));
   check(
     "the workflows profile is the workflow tools plus a credential check",
-    workflows === 6,
-    `${workflows} tools`
+    workflows === workflowsOnly + size(resolveGroups("account")),
+    `profile ${workflows}, group ${workflowsOnly}, account ${size(resolveGroups("account"))}`
   );
 
   check(
     "a profile shadows its group, and <group>_only reaches past it",
-    size(resolveGroups("workflows_only")) === 5 && workflows === 6,
-    `workflows_only ${size(resolveGroups("workflows_only"))}, workflows ${workflows}`
+    workflowsOnly < workflows,
+    `workflows_only ${workflowsOnly}, workflows ${workflows}`
   );
 
   check(

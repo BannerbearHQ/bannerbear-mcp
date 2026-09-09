@@ -87,6 +87,8 @@ export const TOOL_SCOPES: Record<string, string> = {
   get_workflow_run: "workflows:read",
   list_workflow_runs: "workflows:read",
   run_workflow: "workflows:write",
+  upsert_workflow: "workflows:write",
+  delete_workflow: "workflows:write",
 
   generate_animation: "animations:write",
   get_animation: "animations:read",
@@ -95,6 +97,7 @@ export const TOOL_SCOPES: Record<string, string> = {
   get_animation_template: "animation_templates:read",
   upsert_animation_template: "animation_templates:write",
   delete_animation_template: "animation_templates:write",
+  animate_template: "animation_templates:write",
 };
 
 /**

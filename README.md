@@ -47,7 +47,7 @@ breaking changes without opting in.
 
 ## Tools
 
-**24 tools by default**, 60 in total across all 61 V5 endpoints.
+**27 tools by default**, 63 in total across all 65 V5 endpoints.
 
 The default is the working surface — design a template, render an image or an
 animation from it — plus workflows. Everything else is opt-in; see *Registering
@@ -62,8 +62,8 @@ fewer tools* below.
 | Batches | `create_batch`, `get_batch`, `list_batches` |
 | Assets | `upload_asset`, `check_assets`, `get_asset`, `list_assets` |
 | Publications | `list_publications`, `get_publication`, `install_publication` |
-| Workflows | `list_workflows`, `get_workflow`, `run_workflow`, `get_workflow_run`, `list_workflow_runs` |
-| Animations | `generate_animation`, `get_animation`, `list_animations`, `list_animation_templates`, `get_animation_template`, `upsert_animation_template`, `delete_animation_template` |
+| Workflows | `list_workflows`, `get_workflow`, `upsert_workflow`, `delete_workflow`, `run_workflow`, `get_workflow_run`, `list_workflow_runs` |
+| Animations | `generate_animation`, `get_animation`, `list_animations`, `list_animation_templates`, `get_animation_template`, `upsert_animation_template`, `animate_template`, `delete_animation_template` |
 | Media tools | `remove_bg`, `create_pdf`, `trim_video`, `crop_video`, `resize_video`, `concat_videos`, `overlay_image`, `overlay_video`, `add_audio`, `generate_voiceover`, `subtitle_video`, `create_video_slideshow`, `apply_color_filter`, `soften_video`, `add_cover_art`, `create_gif_preview`, `generate_ai_image`, `get_tool_job`, `list_tool_jobs` |
 | Webhooks | `list_webhooks`, `get_webhook`, `create_webhook`, `update_webhook`, `delete_webhook` |
 | Instant URLs | `list_instant_urls`, `get_instant_url`, `create_instant_url`, `update_instant_url`, `delete_instant_url` |
@@ -74,17 +74,19 @@ dashboard and `run_workflow` runs them in order, each feeding the next — so
 four with intermediate URLs to thread. `/workflows` serves just those five tools
 plus `get_account`, at ~2.7k tokens against ~14.2k for everything.
 
-Animation templates are keyframed in the dashboard editor; the API manages their
-metadata only, so `upsert_animation_template` takes no layers and a new template
-starts empty.
+Animation templates carry layers and keyframes like image templates do.
+`animate_template` applies a named preset — FadeIn, PopIn, ScaleOut and so on —
+across layers with an optional stagger; it is deterministic, costs nothing, and
+is the right tool for an ordinary entrance or exit. Hand-written keyframes go
+through `upsert_animation_template`, which replaces the canvas wholesale.
 
 A scoped API key sees fewer tools — see below.
 
 ### Registering fewer tools
 
 Every tool definition is spent on every conversation whether it gets used or
-not, so the default registers five groups rather than ten — 24 tools at ~5.7k
-tokens, against 60 and ~15.0k for the lot. A deployment that only runs
+not, so the default registers five groups rather than ten — 27 tools at ~7.2k
+tokens, against 63 and ~16.8k for the lot. A deployment that only runs
 workflows can go down to six.
 
 Over stdio, set `MCP_TOOL_GROUPS`:
@@ -97,9 +99,9 @@ Hosted, the path picks it, so each caller chooses their own surface at connect
 time rather than the deployment choosing for everyone:
 
 ```
-https://mcp.example.com/            24 tools   ~5.7k tokens   (default)
-https://mcp.example.com/workflows    6 tools   ~1.1k
-https://mcp.example.com/all         60 tools  ~15.0k
+https://mcp.example.com/            27 tools   ~7.2k tokens   (default)
+https://mcp.example.com/workflows    8 tools   ~1.8k
+https://mcp.example.com/all         63 tools  ~16.8k
 ```
 
 | Group | Tools | Tokens |
@@ -111,17 +113,17 @@ https://mcp.example.com/all         60 tools  ~15.0k
 | `generation` | 6 | ~1,770 |
 | `assets` | 4 | ~907 |
 | `publications` | 3 | ~524 |
-| `media` | 19 | ~6,200 |
-| `animations` | 7 | ~1,429 |
-| `workflows` | 5 | ~923 |
+| `media` | 19 | ~6,590 |
+| `animations` | 8 | ~2,130 |
+| `workflows` | 7 | ~1,694 |
 
 Three profiles are named:
 
 | Profile | Groups | Tools |
 | --- | --- | --- |
-| `default` | account, templates, generation, animations, workflows | 24 |
-| `workflows` | account, workflows | 6 |
-| `all` | every group | 60 |
+| `default` | account, templates, generation, animations, workflows | 27 |
+| `workflows` | account, workflows | 8 |
+| `all` | every group | 63 |
 
 Anything else is a comma-separated list of groups — `account,workflows,generation`
 composes exactly what a caller needs, so no argument about what belongs in a name

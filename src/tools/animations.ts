@@ -16,6 +16,7 @@ import {
   type ToolResult,
 } from "./common.js";
 import { progressReporter } from "./toolkit.js";
+import { validateLayers } from "./templates.js";
 
 /**
  * Animations render from their own template family, keyframed in the dashboard.
@@ -183,9 +184,11 @@ export function registerAnimationTools(
       title: "Create or update an animation template",
       description:
         "Create a new animation template, or update an existing one by passing " +
-        "uid. Metadata only — layers and keyframes are authored in the " +
-        "dashboard editor and cannot be set through the API, so a new template " +
-        "starts empty. Updating is subject to the same api_write_access lock as " +
+        "uid. Pass config to set layers and keyframes; omit it to change only " +
+        "the metadata. config replaces wholesale, so fetch the template first " +
+        "and send back the complete canvas when editing. For ordinary entrance " +
+        "and exit animations, animate_template is easier and cannot corrupt a " +
+        "timeline by omission. Subject to the same api_write_access lock as " +
         "image templates.",
       inputSchema: {
         uid: z
@@ -201,16 +204,106 @@ export function registerAnimationTools(
           .union(ANIMATION_FRAME_RATES.map((f) => z.literal(f)) as any)
           .optional()
           .describe("Frames per second"),
+        config: z
+          .object({
+            objects: z
+              .array(z.record(z.any()))
+              .optional()
+              .describe("Layers on the canvas — same shape as an image template"),
+            keyframes: z
+              .record(z.any())
+              .optional()
+              .describe(
+                "Animation keyframes, keyed by layer id. Drives the animation " +
+                  "and determines the duration."
+              ),
+          })
+          .optional()
+          .describe(
+            "Canvas configuration, replaced wholesale. Omit to leave the " +
+              "existing config untouched — sending a partial config discards " +
+              "whatever you left out."
+          ),
       },
     },
     async ({ uid, ...body }) => {
       if (!uid && !body.name) return fail("name is required when creating a template");
+      if ((body as any).config?.objects) {
+        const problem = validateLayers((body as any).config.objects, "config.objects");
+        if (problem) return fail(problem);
+      }
+      if (!opts.allowGenerative && (body as any).config?.objects) {
+        const problem = findGenerativeFields((body as any).config.objects, "config.objects");
+        if (problem) return fail(problem);
+      }
       return guard(() =>
         uid
           ? client.request("PATCH", `/animation_templates/${uid}`, { body })
           : client.request("POST", "/animation_templates", { body })
       );
     }
+  );
+
+  server.registerTool(
+    "animate_template",
+    {
+      title: "Animate a template with a preset",
+      description:
+        "Apply a named animation preset to a template's layers, optionally " +
+        "staggered so they start one after another. Deterministic and free — " +
+        "no model call, no AI credits, and the same request always produces " +
+        "the same keyframes. Prefer this over hand-writing keyframes through " +
+        "upsert_animation_template whenever the request is an ordinary " +
+        "entrance or exit.",
+      inputSchema: {
+        uid: z.string().describe("Animation template UID"),
+        preset: z
+          .enum([
+            "FadeIn", "FadeOut", "ZoomIn", "ZoomOut", "GetBigger",
+            "GetSmaller", "ScaleIn", "ScaleOut", "PopIn", "PopOut",
+          ])
+          .describe(
+            "PopIn and PopOut are measured in em and apply to text layers " +
+              "only; the rest work on any layer"
+          ),
+        objects: z
+          .array(z.string())
+          .optional()
+          .describe(
+            "Layer ids, in the order the stagger should run. Omit to animate " +
+              "every layer."
+          ),
+        duration: z
+          .number()
+          .int()
+          .optional()
+          .describe("How long each layer's tween runs, in ms. Defaults to 400."),
+        stagger: z
+          .number()
+          .int()
+          .optional()
+          .describe(
+            "Milliseconds between each layer's start. At 500, layers begin at " +
+              "0, 500, 1000. Defaults to 0, meaning all at once."
+          ),
+        easing: z
+          .string()
+          .optional()
+          .describe("Optional anime.js easing, e.g. easeOutCubic"),
+        merge: z
+          .boolean()
+          .optional()
+          .describe(
+            "Keep keyframes on layers this call does not touch. Defaults to " +
+              "false, which replaces the whole timeline — pass true when adding " +
+              "to an existing animation rather than starting over."
+          ),
+      },
+    },
+    async ({ uid, ...body }) =>
+      guard(() =>
+        client.request("POST", `/animation_templates/${uid}/animate`, { body })
+      )
   );
 
   server.registerTool(
