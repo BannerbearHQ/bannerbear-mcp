@@ -469,6 +469,53 @@ export function registerToolkitTools(
   );
 
   asyncTool(
+    "create_gif_preview",
+    "Make a GIF preview of a video",
+    "Turn the opening seconds of a video into an animated GIF — for a preview " +
+      "thumbnail or somewhere a video won't play.",
+    {
+      video_url: videoUrl,
+      fps: z.number().int().optional().describe("Up to 8, defaults to 8"),
+      width: z
+        .number()
+        .int()
+        .optional()
+        .describe("Up to 480; height follows the source's aspect ratio"),
+      duration: z
+        .number()
+        .optional()
+        .describe("Seconds from the start, up to 5. Defaults to 5."),
+    }
+  );
+
+  // Generative by definition — the whole tool is a text prompt in, an image
+  // out — so it goes unregistered wherever generation is switched off.
+  if (opts.allowGenerative !== false) asyncTool(
+    "generate_ai_image",
+    "Generate an image from a prompt",
+    "Generate an image from a text description. Distinct from generate_image, " +
+      "which renders a template you designed — this invents new imagery, and " +
+      "costs vary by model.",
+    {
+      prompt: z
+        .string()
+        .describe("What to generate — subject, style and composition"),
+      model: z
+        .enum(["flux_schnell", "flux_1_1_pro", "nano_banana", "gpt_image_2"])
+        .default("flux_schnell")
+        .describe("Costs vary by model"),
+      aspect_ratio: z
+        .enum(["1:1", "16:9", "9:16", "4:3", "3:4"])
+        .optional()
+        .describe("Defaults to 1:1"),
+      reference_image_url: z
+        .string()
+        .optional()
+        .describe("Optional starting point — only some models accept one"),
+    }
+  );
+
+  asyncTool(
     "add_cover_art",
     "Set a video's poster image",
     "Embed a still as the video's poster thumbnail. No re-encode, so this is " +

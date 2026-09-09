@@ -762,12 +762,21 @@ check(
       allowGenerative: false,
     }).handles
   );
+  // Named rather than counted: a new generative tool should fail this by name
+  // when someone forgets to gate it, not slip past a count that happens to
+  // still add up.
+  const GENERATIVE_TOOLS = ["generate_voiceover", "generate_ai_image"];
   check(
-    "generate_voiceover is unregistered when generation is off",
-    withGen.includes("generate_voiceover") &&
-      !withoutGen.includes("generate_voiceover") &&
-      withoutGen.length === withGen.length - 1,
-    `with ${withGen.length}, without ${withoutGen.length}`
+    "every generative tool is unregistered when generation is off",
+    GENERATIVE_TOOLS.every((n) => withGen.includes(n)) &&
+      GENERATIVE_TOOLS.every((n) => !withoutGen.includes(n)),
+    `still present: ${GENERATIVE_TOOLS.filter((n) => withoutGen.includes(n)).join(", ")}`
+  );
+
+  check(
+    "and nothing beyond them is dropped",
+    withoutGen.length === withGen.length - GENERATIVE_TOOLS.length,
+    `with ${withGen.length}, without ${withoutGen.length}, expected a difference of ${GENERATIVE_TOOLS.length}`
   );
 
   check(

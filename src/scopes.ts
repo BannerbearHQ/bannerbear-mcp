@@ -75,6 +75,8 @@ export const TOOL_SCOPES: Record<string, string> = {
   apply_color_filter: "tools:write",
   soften_video: "tools:write",
   add_cover_art: "tools:write",
+  create_gif_preview: "tools:write",
+  generate_ai_image: "tools:write",
   get_tool_job: "tools:read",
   list_tool_jobs: "tools:read",
 

@@ -47,7 +47,7 @@ breaking changes without opting in.
 
 ## Tools
 
-**24 tools by default**, 58 in total across all 59 V5 endpoints.
+**24 tools by default**, 60 in total across all 61 V5 endpoints.
 
 The default is the working surface — design a template, render an image or an
 animation from it — plus workflows. Everything else is opt-in; see *Registering
@@ -64,7 +64,7 @@ fewer tools* below.
 | Publications | `list_publications`, `get_publication`, `install_publication` |
 | Workflows | `list_workflows`, `get_workflow`, `run_workflow`, `get_workflow_run`, `list_workflow_runs` |
 | Animations | `generate_animation`, `get_animation`, `list_animations`, `list_animation_templates`, `get_animation_template`, `upsert_animation_template`, `delete_animation_template` |
-| Media tools | `remove_bg`, `create_pdf`, `trim_video`, `crop_video`, `resize_video`, `concat_videos`, `overlay_image`, `overlay_video`, `add_audio`, `generate_voiceover`, `subtitle_video`, `create_video_slideshow`, `apply_color_filter`, `soften_video`, `add_cover_art`, `get_tool_job`, `list_tool_jobs` |
+| Media tools | `remove_bg`, `create_pdf`, `trim_video`, `crop_video`, `resize_video`, `concat_videos`, `overlay_image`, `overlay_video`, `add_audio`, `generate_voiceover`, `subtitle_video`, `create_video_slideshow`, `apply_color_filter`, `soften_video`, `add_cover_art`, `create_gif_preview`, `generate_ai_image`, `get_tool_job`, `list_tool_jobs` |
 | Webhooks | `list_webhooks`, `get_webhook`, `create_webhook`, `update_webhook`, `delete_webhook` |
 | Instant URLs | `list_instant_urls`, `get_instant_url`, `create_instant_url`, `update_instant_url`, `delete_instant_url` |
 
@@ -84,7 +84,7 @@ A scoped API key sees fewer tools — see below.
 
 Every tool definition is spent on every conversation whether it gets used or
 not, so the default registers five groups rather than ten — 24 tools at ~5.7k
-tokens, against 58 and ~14.2k for the lot. A deployment that only runs
+tokens, against 60 and ~15.0k for the lot. A deployment that only runs
 workflows can go down to six.
 
 Over stdio, set `MCP_TOOL_GROUPS`:
@@ -99,7 +99,7 @@ time rather than the deployment choosing for everyone:
 ```
 https://mcp.example.com/            24 tools   ~5.7k tokens   (default)
 https://mcp.example.com/workflows    6 tools   ~1.1k
-https://mcp.example.com/all         58 tools  ~14.2k
+https://mcp.example.com/all         60 tools  ~15.0k
 ```
 
 | Group | Tools | Tokens |
@@ -111,7 +111,7 @@ https://mcp.example.com/all         58 tools  ~14.2k
 | `generation` | 6 | ~1,770 |
 | `assets` | 4 | ~907 |
 | `publications` | 3 | ~524 |
-| `media` | 17 | ~5,489 |
+| `media` | 19 | ~6,200 |
 | `animations` | 7 | ~1,429 |
 | `workflows` | 5 | ~923 |
 
@@ -121,7 +121,7 @@ Three profiles are named:
 | --- | --- | --- |
 | `default` | account, templates, generation, animations, workflows | 24 |
 | `workflows` | account, workflows | 6 |
-| `all` | every group | 58 |
+| `all` | every group | 60 |
 
 Anything else is a comma-separated list of groups — `account,workflows,generation`
 composes exactly what a caller needs, so no argument about what belongs in a name
@@ -154,7 +154,8 @@ to the deployment rather than the account, which is what stops a pointless retry
 and stops there.
 
 It refuses `ai-prompt` and `ai-background-generate: enabled` in modifications
-*and* in template layers, and leaves `generate_voiceover` unregistered. Gating
+*and* in template layers, and leaves `generate_voiceover` and
+`generate_ai_image` unregistered. Gating
 only modifications would be theatre — a prompt saved onto a template generates
 on every later render with no modification involved — and leaving speech
 synthesis registered while refusing image prompts would be an inconsistent line.
