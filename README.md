@@ -47,10 +47,11 @@ breaking changes without opting in.
 
 ## Tools
 
-**17 tools by default**, 58 in total across all 59 V5 endpoints.
+**24 tools by default**, 58 in total across all 59 V5 endpoints.
 
-The default is the classic working surface — design a template, render from it —
-plus workflows. Everything else is opt-in; see *Registering fewer tools* below.
+The default is the working surface — design a template, render an image or an
+animation from it — plus workflows. Everything else is opt-in; see *Registering
+fewer tools* below.
 
 | Group | Tools |
 | --- | --- |
@@ -82,7 +83,7 @@ A scoped API key sees fewer tools — see below.
 ### Registering fewer tools
 
 Every tool definition is spent on every conversation whether it gets used or
-not, so the default registers four groups rather than ten — 17 tools at ~4.2k
+not, so the default registers five groups rather than ten — 24 tools at ~5.7k
 tokens, against 58 and ~14.2k for the lot. A deployment that only runs
 workflows can go down to six.
 
@@ -96,7 +97,7 @@ Hosted, the path picks it, so each caller chooses their own surface at connect
 time rather than the deployment choosing for everyone:
 
 ```
-https://mcp.example.com/            17 tools   ~4.2k tokens   (default)
+https://mcp.example.com/            24 tools   ~5.7k tokens   (default)
 https://mcp.example.com/workflows    6 tools   ~1.1k
 https://mcp.example.com/all         58 tools  ~14.2k
 ```
@@ -118,7 +119,7 @@ Three profiles are named:
 
 | Profile | Groups | Tools |
 | --- | --- | --- |
-| `default` | account, templates, generation, workflows | 17 |
+| `default` | account, templates, generation, animations, workflows | 24 |
 | `workflows` | account, workflows | 6 |
 | `all` | every group | 58 |
 

@@ -57,6 +57,16 @@ export function instructionsFor(groups: string[]): string {
         "than listed up front — call it before designing a layer type."
     );
   }
+  if (has("animations")) {
+    lines.push(
+      "Animations render from their own template family and their duration " +
+        "comes from the template's keyframes, not from the render call. Those " +
+        "keyframes are authored in the dashboard editor and cannot be set " +
+        "through the API — upsert_animation_template manages name, size and " +
+        "frame rate only, so a template created here starts empty and has to " +
+        "be finished by hand before it will render anything."
+    );
+  }
   if (has("generation")) {
     lines.push(
       "Rendering more than a handful at once? create_batch takes 100 per " +
@@ -125,12 +135,17 @@ export const TOOL_GROUPS = Object.keys(GROUPS);
  * resolveGroups.
  */
 const PROFILES: Record<string, string[]> = {
-  // What an unqualified connection gets: the classic working surface — design a
-  // template, render from it — plus workflows, plus the credential check.
-  // Deliberately not everything. The full set is a mouthful of tools to hand
-  // someone who asked for none, and most of it is either composed by workflows
-  // or configured once in the dashboard.
-  default: ["account", "templates", "generation", "workflows"],
+  // What an unqualified connection gets: the working surface — design a
+  // template, render an image or an animation from it — plus workflows, plus
+  // the credential check. Deliberately not everything: the rest is either
+  // composed by workflows or configured once in the dashboard.
+  //
+  // Animations are here because rendering one is an everyday ask, even though
+  // most of the group is template management. Splitting the group to admit
+  // generate_animation alone would buy about a thousand tokens and cost the
+  // ability to find a template to render from, which is not a trade worth
+  // making.
+  default: ["account", "templates", "generation", "animations", "workflows"],
   // Workflows compose the rest server-side, so a caller working through them
   // needs the workflow tools and a way to prove their credential, nothing more.
   workflows: ["account", "workflows"],

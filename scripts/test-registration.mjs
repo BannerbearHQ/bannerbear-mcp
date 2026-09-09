@@ -290,6 +290,8 @@ check(
     "upsert_image_template",
     "generate_image",
     "create_batch",
+    "generate_animation",
+    "list_animation_templates",
     "list_workflows",
     "run_workflow",
   ];
@@ -301,10 +303,10 @@ check(
 
   check(
     "and leaves out what is configured once or composed by workflows",
-    ["create_webhook", "create_instant_url", "trim_video", "generate_animation"].every(
+    ["create_webhook", "create_instant_url", "trim_video", "upload_asset"].every(
       (n) => !inDefault.includes(n)
     ),
-    `unexpectedly present: ${["create_webhook", "create_instant_url", "trim_video", "generate_animation"].filter((n) => inDefault.includes(n)).join(", ")}`
+    `unexpectedly present: ${["create_webhook", "create_instant_url", "trim_video", "upload_asset"].filter((n) => inDefault.includes(n)).join(", ")}`
   );
 
   check(
