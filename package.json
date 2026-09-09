@@ -1,6 +1,6 @@
 {
   "name": "@bannerbear/mcp",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "description": "Model Context Protocol server for the Bannerbear V5 API",
   "license": "MIT",
   "type": "module",

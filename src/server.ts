@@ -16,7 +16,7 @@ import { registerToolkitTools } from "./tools/toolkit.js";
 import { registerWorkflowTools } from "./tools/workflows.js";
 import { registerAnimationTools } from "./tools/animations.js";
 
-export const VERSION = "0.11.0";
+export const VERSION = "0.12.0";
 
 /** One line on what this server is, for anyone deciding whether to connect. */
 export const SUMMARY =
