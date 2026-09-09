@@ -99,7 +99,7 @@ Hosted, the path picks it, so each caller chooses their own surface at connect
 time rather than the deployment choosing for everyone:
 
 ```
-https://mcp.example.com/            27 tools   ~7.2k tokens   (default)
+https://mcp.example.com/            30 tools   ~7.7k tokens   (default)
 https://mcp.example.com/workflows    8 tools   ~1.8k
 https://mcp.example.com/all         63 tools  ~16.8k
 ```
@@ -121,7 +121,7 @@ Three profiles are named:
 
 | Profile | Groups | Tools |
 | --- | --- | --- |
-| `default` | account, templates, generation, animations, workflows | 27 |
+| `default` | account, templates, generation, publications, animations, workflows | 30 |
 | `workflows` | account, workflows | 8 |
 | `all` | every group | 63 |
 

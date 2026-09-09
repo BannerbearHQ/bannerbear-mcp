@@ -58,6 +58,15 @@ export function instructionsFor(groups: string[]): string {
         "than listed up front — call it before designing a layer type."
     );
   }
+  if (has("publications")) {
+    lines.push(
+      "No template to work from? list_publications browses a public library of " +
+        "ready-made ones and install_publication copies one into the workspace, " +
+        "after which it behaves like any other template. Note it lists the " +
+        "public library only — a user's own unlisted publications are not " +
+        "enumerable, so those need a uid from their dashboard."
+    );
+  }
   if (has("animations")) {
     lines.push(
       "Animations render from their own template family and their duration " +
@@ -148,7 +157,19 @@ const PROFILES: Record<string, string[]> = {
   // generate_animation alone would buy about a thousand tokens and cost the
   // ability to find a template to render from, which is not a trade worth
   // making.
-  default: ["account", "templates", "generation", "animations", "workflows"],
+  //
+  // Publications are here for the same reason at a fifth of the price: browsing
+  // a library and installing what fits is discovery, which a conversation does
+  // better than a dashboard, and it lands the user on a template the rest of
+  // this profile can immediately render from.
+  default: [
+    "account",
+    "templates",
+    "generation",
+    "publications",
+    "animations",
+    "workflows",
+  ],
   // Workflows compose the rest server-side, so a caller working through them
   // needs the workflow tools and a way to prove their credential, nothing more.
   workflows: ["account", "workflows"],
