@@ -344,10 +344,8 @@ export function createHandler(opts: HandlerOptions = {}) {
     // everything, which is what every existing client already asks for.
     const [rawPath, rawQuery = ""] = (req.url ?? "/").split("?");
     const path = rawPath.replace(/\/+$/, "") || "/";
-    // `chat` is the name to hand out: a URL reading disable-generative
-    // announces there is a generative capability behind it, which invites
-    // exactly the probing it exists to avoid. Both spellings work — the
-    // explicit one stays for anyone who already wired it up.
+    // `chat` is the preferred spelling. Both work — the explicit one stays for
+    // anyone who already wired it up.
     //
     // A restriction flag fails safe: present means on, unless explicitly
     // switched off. Treating an unrecognised value as "off" would let a typo
