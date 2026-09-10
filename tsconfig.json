@@ -12,6 +12,11 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "declaration": false,
+    // Comments are preserved by default, and `files: ["dist"]` publishes dist,
+    // so every source comment ships to npm in readable JavaScript. Strip them:
+    // the comments in this codebase explain decisions to whoever maintains it,
+    // which is not the same audience as whoever installs it.
+    "removeComments": true,
     "sourceMap": false
   },
   "include": ["src/**/*.ts"]

@@ -4,8 +4,9 @@ dist/
 # Derived from spec/openapi.json by scripts/codegen.mjs — run `npm run build`.
 src/generated/
 
-# Internal notes, shared with the API team privately
+# Internal notes, shared with the API team and the Rails team privately
 NOTES-FOR-API-TEAM.md
+OAUTH-FOR-RAILS.md
 
 # Local editor/agent state
 .claude/settings.local.json
